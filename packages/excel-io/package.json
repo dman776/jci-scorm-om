@@ -1,0 +1,8 @@
+{
+  "name": "@sowb/excel-io",
+  "version": "1.1.0",
+  "type": "module",
+  "main": "index.js",
+  "exports": { ".": "./index.js", "./workbook-xlsx.js": "./workbook-xlsx.js" },
+  "dependencies": { "jszip": "3.10.1" }
+}

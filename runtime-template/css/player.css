@@ -1,0 +1,125 @@
+/* SCORM Observation Workbook - learner runtime styles.
+   Ships verbatim in the exported package. No external fonts or assets. */
+:root {
+  --sowb-blue: #0b2e6f;
+  --sowb-blue-2: #1b4aa0;
+  --sowb-green: #1f8a4c;
+  --sowb-amber: #c98a00;
+  --sowb-orange: #d9480f;
+  --sowb-gray: #6b7280;
+  --sowb-bg: #f4f6fb;
+  --sowb-card: #ffffff;
+  --sowb-border: #d8dee9;
+  --sowb-text: #1f2430;
+  --sowb-focus: #ffb200;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
+  color: var(--sowb-text);
+  background: var(--sowb-bg);
+  line-height: 1.5;
+}
+.sowb-shell { max-width: 980px; margin: 0 auto; padding: 0 16px 64px; }
+.sowb-header {
+  position: sticky; top: 0; z-index: 5;
+  background: var(--sowb-blue); color: #fff;
+  padding: 16px 20px; border-radius: 0 0 12px 12px;
+  display: flex; align-items: center; justify-content: space-between; gap: 24px;
+  margin-bottom: 24px;
+}
+.sowb-title { font-size: 18px; font-weight: 700; }
+.sowb-progress { display: flex; align-items: center; gap: 10px; min-width: 240px; }
+.sowb-progress-track { flex: 1; height: 10px; background: rgba(255,255,255,.25); border-radius: 6px; overflow: hidden; }
+.sowb-progress-fill { height: 100%; background: #4ade80; transition: width .25s ease; }
+.sowb-progress-label { font-size: 13px; white-space: nowrap; }
+
+.sowb-h1 { font-size: 24px; margin: 8px 0 4px; }
+.sowb-desc { color: var(--sowb-gray); margin-top: 0; }
+
+.sowb-section-list { list-style: none; padding: 0; margin: 20px 0; display: grid; gap: 12px; }
+.sowb-section-card {
+  background: var(--sowb-card); border: 1px solid var(--sowb-border); border-left: 6px solid var(--sowb-gray);
+  border-radius: 10px; padding: 16px 18px; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.sowb-section-card.status-completed { border-left-color: var(--sowb-green); }
+.sowb-section-card.status-partially_complete { border-left-color: var(--sowb-orange); }
+.sowb-section-card.status-in_progress { border-left-color: var(--sowb-amber); }
+.sowb-section-card.status-not_started { border-left-color: var(--sowb-gray); }
+.sowb-section-card.locked { opacity: .6; }
+.sowb-section-name { font-weight: 600; }
+.sowb-section-sub { color: var(--sowb-gray); font-size: 13px; }
+.sowb-section-note { color: var(--sowb-orange); font-size: 13px; margin-top: 4px; }
+.sowb-section-right { display: flex; align-items: center; gap: 14px; }
+
+.sowb-pill { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+.pill-completed { background: #dcfce7; color: #166534; }
+.pill-partially_complete { background: #ffe8d9; color: #9a3412; }
+.pill-in_progress { background: #fef3c7; color: #92590a; }
+.pill-not_started { background: #eceff4; color: #4b5563; }
+
+.sowb-btn {
+  background: var(--sowb-blue-2); color: #fff; border: none; border-radius: 8px;
+  padding: 9px 16px; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+.sowb-btn:hover { background: var(--sowb-blue); }
+.sowb-btn:disabled { background: #b6bfce; cursor: not-allowed; }
+.sowb-btn.ghost { background: transparent; color: var(--sowb-blue-2); border: 1px solid var(--sowb-border); }
+.sowb-btn.ghost:hover { background: #eef2fb; }
+.sowb-btn.small { padding: 5px 10px; font-size: 12px; }
+
+.sowb-dash-footer { margin-top: 20px; padding: 14px 16px; background: #eaf1ff; border-radius: 8px; font-size: 14px; }
+
+.sowb-back { background: none; border: none; color: var(--sowb-blue-2); cursor: pointer; font-size: 14px; padding: 0; margin-bottom: 8px; }
+.sowb-counter { color: var(--sowb-gray); font-size: 13px; margin-bottom: 12px; }
+
+.sowb-question { background: var(--sowb-card); border: 1px solid var(--sowb-border); border-radius: 10px; padding: 20px; }
+.sowb-prompt { font-size: 17px; font-weight: 600; display: block; }
+.sowb-req { color: #c0392b; }
+.sowb-help { color: var(--sowb-gray); font-size: 14px; margin: 6px 0 14px; }
+
+.sowb-text, .sowb-textarea {
+  width: 100%; padding: 10px 12px; border: 1px solid var(--sowb-border); border-radius: 8px;
+  font: inherit; color: inherit; background: #fff;
+}
+.sowb-textarea { resize: vertical; }
+.sowb-numeric { max-width: 220px; }
+.sowb-input { margin-top: 12px; }
+.sowb-rule { margin-top: 6px; font-size: 13px; color: var(--sowb-gray); }
+.sowb-url-preview { display: inline-block; margin-top: 8px; font-size: 13px; color: var(--sowb-blue-2); }
+
+.sowb-choices { display: grid; gap: 8px; margin-top: 12px; }
+.sowb-choice { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--sowb-border); border-radius: 8px; cursor: pointer; }
+.sowb-choice:hover { background: #f7f9ff; }
+.sowb-check { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
+
+.sowb-rating { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.sowb-rating-item { display: flex; flex-direction: column; align-items: center; gap: 6px; border: 1px solid var(--sowb-border); border-radius: 8px; padding: 10px 14px; cursor: pointer; min-width: 56px; }
+.sowb-rating-item:hover { background: #f7f9ff; }
+
+.sowb-evidence { margin-top: 12px; }
+.sowb-evidence-chip { margin-top: 10px; background: #eef7ff; border: 1px solid #cfe4ff; padding: 8px 12px; border-radius: 8px; font-size: 13px; }
+
+.sowb-answer-status { margin-top: 14px; font-size: 13px; font-weight: 600; }
+.sowb-answer-status.ok { color: var(--sowb-green); }
+.sowb-answer-status.partial { color: var(--sowb-orange); }
+.sowb-answer-status.req { color: #c0392b; }
+.sowb-answer-status.opt { color: var(--sowb-gray); }
+
+.sowb-nav { display: flex; justify-content: space-between; margin-top: 20px; }
+
+.sowb-debug { margin-top: 28px; background: #0d1117; color: #d1d5db; border-radius: 10px; padding: 16px; font-family: ui-monospace, "Cascadia Code", Consolas, monospace; }
+.sowb-debug-title { font-weight: 700; color: #fff; margin-bottom: 8px; }
+.sowb-debug-btns { margin-bottom: 10px; }
+.sowb-debug-body { white-space: pre-wrap; font-size: 12px; margin: 0; }
+
+/* Accessibility: visible focus ring everywhere. */
+a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, label:focus-within {
+  outline: 3px solid var(--sowb-focus); outline-offset: 2px;
+}
+@media (max-width: 640px) {
+  .sowb-header { flex-direction: column; align-items: flex-start; gap: 10px; }
+  .sowb-progress { width: 100%; }
+  .sowb-section-card { flex-direction: column; align-items: flex-start; }
+}

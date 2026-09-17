@@ -1,0 +1,56 @@
+{
+  "id": "ascend-ae-install-ride-along",
+  "title": "AE Install Ride-Along Observation Workbook",
+  "description": "Field observation workbook for new Account Executives shadowing JCI install activities across their first weeks. Complete each section as you attend the meeting, shadow the install manager, and ride along with a technician.",
+  "version": "1.1",
+  "author": "JCI ASCEND Learning",
+  "courseId": "ascend-ae-install-ride-along",
+  "estimatedDuration": "2-3 weeks",
+  "settings": {
+    "language": "en-US",
+    "navigation": "free",
+    "completionRule": "all-required-sections",
+    "reportSuccess": false,
+    "dashboardHeading": "Your observation workbook"
+  },
+  "sections": [
+    {
+      "id": "s1",
+      "title": "Install Team Meeting",
+      "required": true,
+      "questions": [
+        { "id": "q_s1_1", "type": "datetime", "prompt": "Date of the install team meeting", "required": true, "helpText": "Use the date the meeting took place." },
+        { "id": "q_s1_2", "type": "long_text", "prompt": "What was discussed in the meeting?", "required": true, "helpText": "Summarize scope, safety, roles, and schedule." },
+        { "id": "q_s1_3", "type": "checklist", "prompt": "Which topics were covered?", "required": true, "helpText": "Check all that apply.",
+          "options": [
+            { "id": "o_scope", "label": "Scope review", "expected": true },
+            { "id": "o_safety", "label": "Safety plan", "expected": true },
+            { "id": "o_sched", "label": "Schedule" },
+            { "id": "o_cust", "label": "Customer expectations" }
+          ] }
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "Install Manager Shadow",
+      "required": true,
+      "questions": [
+        { "id": "q_s2_1", "type": "short_text", "prompt": "Manager you shadowed", "required": true },
+        { "id": "q_s2_2", "type": "numeric", "prompt": "How many install jobs did you review this week?", "required": true, "min": 4, "integerOnly": true, "helpText": "Review at least four jobs." },
+        { "id": "q_s2_3", "type": "rating", "prompt": "How confident do you feel about the install handoff process?", "required": true, "scale": ["Low", "Medium", "High"] },
+        { "id": "q_s2_4", "type": "long_text", "prompt": "Describe one thing you learned from the manager", "required": true }
+      ]
+    },
+    {
+      "id": "s3",
+      "title": "Install Technician Ride Along",
+      "required": true,
+      "questions": [
+        { "id": "q_s3_1", "type": "yes_no", "prompt": "Did you complete a full ride-along day?", "required": true },
+        { "id": "q_s3_2", "type": "rating", "prompt": "Rate your understanding of on-site install steps", "required": true, "scale": [1, 2, 3, 4, 5], "helpText": "1 = low, 5 = high" },
+        { "id": "q_s3_3", "type": "url", "prompt": "Link to your ride-along notes or photos", "required": false, "helpText": "Paste a SharePoint or Teams link starting with https://" },
+        { "id": "q_s3_4", "type": "long_text", "prompt": "Notes and observations from the ride along", "required": false }
+      ]
+    }
+  ]
+}

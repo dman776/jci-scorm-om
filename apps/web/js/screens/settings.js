@@ -1,0 +1,74 @@
+// @ts-check
+import { h } from '../ui.js';
+
+const DEFAULT_HEADING = 'Your observation workbook';
+
+export function renderSettings(mount, { store }) {
+  const wb = store.workbook;
+
+  const textField = (label, get, set, opts = {}) => h('label.field', [
+    h('span.field-label', label),
+    opts.textarea
+      ? h('textarea', { rows: 3, value: get() || '', oninput: (e) => store.update(() => set(e.target.value)) })
+      : h('input', {
+          type: 'text', value: get() || '',
+          placeholder: opts.placeholder || '',
+          oninput: (e) => store.update(() => set(e.target.value)),
+        }),
+    opts.hint ? h('span.field-hint', opts.hint) : null,
+  ]);
+
+  const selectField = (label, get, set, options) => h('label.field', [
+    h('span.field-label', label),
+    h('select', { onchange: (e) => store.update(() => set(e.target.value)) },
+      options.map((o) => h('option', { value: o.value, selected: get() === o.value }, o.label))),
+  ]);
+
+  mount.appendChild(h('div.screen-inner', [
+    h('h1.screen-title', 'Workbook Settings'),
+    h('p.screen-sub', 'Metadata and behavior for this observation workbook. These values feed the SCORM manifest and the runtime.'),
+
+    h('div.card', [
+      h('h2.card-title', 'Metadata'),
+      h('div.grid-2', [
+        textField('Title', () => wb.title, (v) => (wb.title = v)),
+        textField('Version', () => wb.version, (v) => (wb.version = v)),
+        textField('Author', () => wb.author, (v) => (wb.author = v)),
+        textField('Course ID', () => wb.courseId, (v) => (wb.courseId = v), { hint: 'Used for the SCORM identifier and file names. Letters, numbers, dashes.' }),
+        textField('Language', () => wb.settings.language, (v) => (wb.settings.language = v)),
+        textField('Estimated Duration', () => wb.estimatedDuration, (v) => (wb.estimatedDuration = v), { hint: 'e.g. "2-3 weeks"' }),
+      ]),
+      textField('Description', () => wb.description, (v) => (wb.description = v), { textarea: true }),
+    ]),
+
+    h('div.card', [
+      h('h2.card-title', 'Learner-facing text'),
+      textField(
+        'Dashboard heading',
+        () => wb.settings.dashboardHeading,
+        (v) => (wb.settings.dashboardHeading = v),
+        {
+          placeholder: DEFAULT_HEADING,
+          hint: `Heading shown above the section list in the learner runtime. For example "Your Milestones" or "Your Observations". Leave blank to use "${DEFAULT_HEADING}".`,
+        }
+      ),
+    ]),
+
+    h('div.card', [
+      h('h2.card-title', 'Behavior'),
+      h('div.grid-2', [
+        selectField('Navigation', () => wb.settings.navigation, (v) => (wb.settings.navigation = v), [
+          { value: 'free', label: 'Free - open any unlocked section' },
+          { value: 'linear', label: 'Linear - finish a section to unlock the next' },
+        ]),
+        selectField('Completion Rule', () => wb.settings.completionRule, (v) => (wb.settings.completionRule = v), [
+          { value: 'all-required-sections', label: 'All required sections complete' },
+        ]),
+      ]),
+      h('label.check-row', [
+        h('input', { type: 'checkbox', checked: !!wb.settings.reportSuccess, onchange: (e) => store.update(() => { wb.settings.reportSuccess = e.target.checked; }) }),
+        h('span', 'Also report cmi.success_status (most observation workbooks report completion only)'),
+      ]),
+    ]),
+  ]));
+}

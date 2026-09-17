@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html lang="{{LANG}}">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{TITLE}}</title>
+  <link rel="stylesheet" href="css/player.css" />
+</head>
+<body>
+  <a class="sowb-skip" href="#sowb-app" style="position:absolute;left:-9999px;">Skip to content</a>
+  <div id="sowb-app" role="main"></div>
+
+  <!-- Workbook definition injected at export time (or served in preview). -->
+  <script src="js/workbook.js"></script>
+  <script type="module">
+    import { WorkbookPlayer } from './js/player.js';
+    const workbook = window.__WORKBOOK__;
+    const debug = new URLSearchParams(location.search).has('debug') || {{DEBUG}};
+    const player = new WorkbookPlayer({
+      mount: document.getElementById('sowb-app'),
+      workbook,
+      debug,
+    });
+    window.__PLAYER__ = player; // exposed for automated tests
+    player.init();
+  </script>
+</body>
+</html>

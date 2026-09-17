@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Learner Preview - Mock LMS</title>
+  <link rel="stylesheet" href="/preview/runtime/css/player.css" />
+  <style>
+    body { background: #eef1f7; }
+    .harness-bar {
+      position: sticky; top: 0; z-index: 20; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+      background: #10233f; color: #fff; padding: 10px 16px; font-family: "Segoe UI", system-ui, sans-serif; font-size: 13px;
+    }
+    .harness-bar strong { margin-right: 6px; }
+    .harness-bar button { background: #2c5cc5; color: #fff; border: none; border-radius: 6px; padding: 7px 12px; font-size: 13px; cursor: pointer; }
+    .harness-bar button.secondary { background: transparent; border: 1px solid rgba(255,255,255,.4); }
+    .harness-bar .spacer { flex: 1; }
+    .harness-bar .lms-flag { background: #1f8a4c; padding: 3px 8px; border-radius: 999px; font-weight: 600; }
+    #host { padding: 8px 0 40px; }
+  </style>
+</head>
+<body>
+  <div class="harness-bar">
+    <span class="lms-flag">Mock LMS</span>
+    <strong>Learner Simulation</strong>
+    <span class="spacer"></span>
+    <label style="display:flex;align-items:center;gap:6px;">
+      <input type="checkbox" id="debugToggle" checked /> Show SCORM debug panel
+    </label>
+    <button id="exitResume" title="Suspend the current session and relaunch to prove resume">Exit + resume</button>
+    <button id="reset" class="secondary" title="Clear all mock LMS state and start a fresh attempt">Reset attempt</button>
+  </div>
+  <div id="host" role="main"></div>
+
+  <script src="/preview/runtime/js/workbook.js"></script>
+  <script type="module">
+    import { MockLMS } from '/preview/mock-lms.js';
+    import { ScormAdapter } from '/preview/runtime/js/adapter.js';
+    import { WorkbookPlayer } from '/preview/runtime/js/player.js';
+
+    const workbook = window.__WORKBOOK__;
+    const host = document.getElementById('host');
+    const debugToggle = document.getElementById('debugToggle');
+
+    // One persistent mock LMS across attempts so suspend/resume behaves like WDL.
+    const lms = new MockLMS();
+    let player = null;
+
+    function launch() {
+      host.innerHTML = '';
+      const adapter = new ScormAdapter({ api: lms.newAttempt() });
+      player = new WorkbookPlayer({ mount: host, workbook, adapter, debug: debugToggle.checked });
+      window.__PLAYER__ = player;
+      window.__LMS__ = lms;
+      player.init();
+    }
+
+    document.getElementById('exitResume').addEventListener('click', () => {
+      if (player) player.session.suspendAndExit();
+      launch(); // relaunch -> cmi.entry becomes 'resume', state restored, lands on dashboard
+    });
+    document.getElementById('reset').addEventListener('click', () => {
+      lms.persistent['cmi.suspend_data'] = '';
+      lms.persistent['cmi.exit'] = '';
+      lms.persistent['cmi.location'] = '';
+      lms.persistent['cmi.completion_status'] = 'unknown';
+      lms.persistent['cmi.progress_measure'] = '';
+      launch();
+    });
+    debugToggle.addEventListener('change', () => { if (player) { player.debug = debugToggle.checked; player.render(); } });
+
+    launch();
+  </script>
+</body>
+</html>

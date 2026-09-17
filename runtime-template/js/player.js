@@ -1,0 +1,540 @@
+// @ts-check
+/**
+ * Learner runtime player (DOM layer). This is the SAME module used by the
+ * authoring preview (against the mock LMS) and shipped inside the exported
+ * SCORM package (against the real LMS). All SCORM interaction + state lives in
+ * SessionCore; this file only renders and wires events.
+ *
+ * The workbook definition is provided by the host page as `window.__WORKBOOK__`.
+ */
+
+import { ScormAdapter } from './adapter.js';
+import { SessionCore } from './session.js';
+import {
+  getResponseState, getRequirementHint, isValidHttpUrl,
+  COMPLETE, PARTIAL, EMPTY,
+  COMPLETED, IN_PROGRESS, PARTIALLY_COMPLETE, NOT_STARTED,
+} from './engine/completion.js';
+
+const STATUS_LABEL = {
+  [COMPLETED]: 'Completed',
+  [PARTIALLY_COMPLETE]: 'Partially Complete',
+  [IN_PROGRESS]: 'In Progress',
+  [NOT_STARTED]: 'Not Started',
+};
+
+const DEFAULT_HEADING = 'Your observation workbook';
+
+export class WorkbookPlayer {
+  /**
+   * @param {{ mount: HTMLElement, workbook: import('@sowb/shared').Workbook,
+   *   adapter?: ScormAdapter, debug?: boolean }} opts
+   */
+  constructor(opts) {
+    this.mount = opts.mount;
+    this.workbook = opts.workbook;
+    this.debug = !!opts.debug;
+    const adapter = opts.adapter || new ScormAdapter();
+    this.session = new SessionCore({ workbook: this.workbook, adapter });
+    this.adapter = adapter;
+    this.view = 'dashboard';
+  }
+
+  get state() { return this.session.state; }
+
+  /** Author-configurable dashboard heading, with a safe default. */
+  get dashboardHeading() {
+    const h = this.workbook.settings && this.workbook.settings.dashboardHeading;
+    return (h && String(h).trim()) || DEFAULT_HEADING;
+  }
+
+  init() {
+    // Restore state from the LMS, but ALWAYS land on the section dashboard on
+    // launch (including resume) so the learner chooses what to continue.
+    this.session.init();
+    this.view = 'dashboard';
+    window.addEventListener('beforeunload', () => this.session.suspendAndExit());
+    this.render();
+  }
+
+  // ---- navigation --------------------------------------------------------
+
+  goToDashboard() { this.view = 'dashboard'; this.session.save(); this.render(); }
+  openSection(sectionId) { if (this.session.openSection(sectionId)) { this.view = 'section'; this.render(); } }
+  nextPage() { if (this.session.nextPage()) this.render(); else this.goToDashboard(); }
+  prevPage() { if (this.session.prevPage()) this.render(); else this.goToDashboard(); }
+
+  setResponse(questionId, value) {
+    this.session.setResponse(questionId, value);
+    this._refreshChrome();
+  }
+
+  // ---- rendering ---------------------------------------------------------
+
+  render() {
+    this.mount.innerHTML = '';
+    const shell = el('div', 'sowb-shell');
+    shell.appendChild(this._renderHeader());
+    const main = el('main', 'sowb-main');
+    main.appendChild(this.view === 'dashboard' ? this._renderDashboard() : this._renderSection());
+    shell.appendChild(main);
+    if (this.debug) shell.appendChild(this._renderDebug());
+    this.mount.appendChild(shell);
+  }
+
+  /** Update progress + the current answer status without a full re-render. */
+  _refreshChrome() {
+    const bar = this.mount.querySelector('[data-progress-fill]');
+    if (bar) {
+      const pct = Math.round(this.session.progress() * 100);
+      /** @type {HTMLElement} */ (bar).style.width = pct + '%';
+      const label = this.mount.querySelector('[data-progress-label]');
+      if (label) label.textContent = pct + '% complete';
+    }
+    if (this.view === 'section') {
+      const q = this.session.currentSection().questions[this.state.currentPage];
+      const status = this.mount.querySelector('[data-answer-status]');
+      if (status && q) {
+        const info = this._answerStatus(q);
+        status.textContent = info.text;
+        status.className = 'sowb-answer-status ' + info.cls;
+        status.setAttribute('data-answer-status', '');
+      }
+      // Live-update the url preview link if present.
+      const link = this.mount.querySelector('[data-url-preview]');
+      if (link && q && q.type === 'url') {
+        const v = String(this.state.responses[q.id] || '').trim();
+        if (isValidHttpUrl(v)) {
+          link.setAttribute('href', v);
+          link.textContent = 'Open link';
+          /** @type {HTMLElement} */ (link).style.display = '';
+        } else {
+          /** @type {HTMLElement} */ (link).style.display = 'none';
+        }
+      }
+    }
+    if (this.debug) {
+      const d = this.mount.querySelector('[data-debug-body]');
+      if (d) d.textContent = this._debugText();
+    }
+  }
+
+  /** @param {import('@sowb/shared').Question} q */
+  _answerStatus(q) {
+    const state = getResponseState(q, this.state.responses[q.id]);
+    if (state === COMPLETE) return { text: 'Answer saved', cls: 'ok' };
+    if (state === PARTIAL) return { text: getRequirementHint(q, this.state.responses[q.id]), cls: 'partial' };
+    return { text: q.required ? 'Required' : 'Optional', cls: q.required ? 'req' : 'opt' };
+  }
+
+  _renderHeader() {
+    const header = el('header', 'sowb-header');
+    const title = el('div', 'sowb-title');
+    title.textContent = this.workbook.title;
+    header.appendChild(title);
+
+    const pct = Math.round(this.session.progress() * 100);
+    const progress = el('div', 'sowb-progress');
+    const track = el('div', 'sowb-progress-track');
+    const fill = el('div', 'sowb-progress-fill');
+    fill.setAttribute('data-progress-fill', '');
+    fill.style.width = pct + '%';
+    track.appendChild(fill);
+    const label = el('span', 'sowb-progress-label');
+    label.setAttribute('data-progress-label', '');
+    label.textContent = pct + '% complete';
+    progress.appendChild(track);
+    progress.appendChild(label);
+    header.appendChild(progress);
+    return header;
+  }
+
+  _renderDashboard() {
+    const wrap = el('section', 'sowb-dashboard');
+    const h = el('h1', 'sowb-h1');
+    h.setAttribute('data-dashboard-heading', '');
+    h.textContent = this.dashboardHeading;
+    wrap.appendChild(h);
+    if (this.workbook.description) {
+      const p = el('p', 'sowb-desc');
+      p.textContent = this.workbook.description;
+      wrap.appendChild(p);
+    }
+
+    const list = el('ul', 'sowb-section-list');
+    list.setAttribute('role', 'list');
+    this.workbook.sections.forEach((section, idx) => {
+      const status = this.state.sectionStatus[section.id] || NOT_STARTED;
+      const unlocked = this.session.isUnlocked(section.id);
+      const li = el('li', 'sowb-section-card status-' + status + (unlocked ? '' : ' locked'));
+
+      const meta = el('div', 'sowb-section-meta');
+      const name = el('div', 'sowb-section-name');
+      name.textContent = `Section ${idx + 1}: ${section.title}`;
+      const sub = el('div', 'sowb-section-sub');
+      sub.textContent = (section.required ? 'Required' : 'Optional') +
+        ` \u00b7 ${section.questions.length} item${section.questions.length === 1 ? '' : 's'}`;
+      meta.appendChild(name);
+      meta.appendChild(sub);
+      if (status === PARTIALLY_COMPLETE) {
+        const note = el('div', 'sowb-section-note');
+        note.textContent = 'Every item has a response, but some requirements are not yet met.';
+        meta.appendChild(note);
+      }
+
+      const right = el('div', 'sowb-section-right');
+      const pill = el('span', 'sowb-pill pill-' + status);
+      pill.textContent = STATUS_LABEL[status];
+      pill.setAttribute('data-section-status', section.id);
+      right.appendChild(pill);
+
+      const btn = el('button', 'sowb-btn');
+      btn.type = 'button';
+      btn.textContent = unlocked
+        ? (status === COMPLETED ? 'Review' : status === NOT_STARTED ? 'Start' : 'Continue')
+        : 'Locked';
+      btn.disabled = !unlocked;
+      btn.setAttribute('data-open-section', section.id);
+      btn.setAttribute('aria-label', `${unlocked ? 'Open' : 'Locked'} Section ${idx + 1}: ${section.title}`);
+      btn.addEventListener('click', () => this.openSection(section.id));
+      right.appendChild(btn);
+
+      li.appendChild(meta);
+      li.appendChild(right);
+      list.appendChild(li);
+    });
+    wrap.appendChild(list);
+
+    const footer = el('div', 'sowb-dash-footer');
+    footer.setAttribute('data-dash-footer', '');
+    footer.textContent = this.session.isComplete()
+      ? 'All required sections are complete. Your progress has been reported to the LMS.'
+      : 'Complete every required section to finish this workbook. Your work saves automatically.';
+    wrap.appendChild(footer);
+    return wrap;
+  }
+
+  _renderSection() {
+    const section = this.session.currentSection();
+    const wrap = el('section', 'sowb-section-view');
+
+    const crumbs = el('button', 'sowb-back');
+    crumbs.type = 'button';
+    crumbs.textContent = '\u2190 Back to sections';
+    crumbs.setAttribute('data-back', '');
+    crumbs.addEventListener('click', () => this.goToDashboard());
+    wrap.appendChild(crumbs);
+
+    const h = el('h1', 'sowb-h1');
+    h.textContent = section.title;
+    wrap.appendChild(h);
+
+    const total = section.questions.length;
+    const page = Math.min(this.state.currentPage, total - 1);
+    this.state.currentPage = page;
+    const question = section.questions[page];
+
+    const counter = el('div', 'sowb-counter');
+    counter.textContent = `Question ${page + 1} of ${total}`;
+    wrap.appendChild(counter);
+
+    wrap.appendChild(this._renderQuestion(question));
+
+    const nav = el('div', 'sowb-nav');
+    const prev = el('button', 'sowb-btn ghost');
+    prev.type = 'button';
+    prev.textContent = page === 0 ? 'Dashboard' : 'Previous';
+    prev.setAttribute('data-prev', '');
+    prev.addEventListener('click', () => this.prevPage());
+    const next = el('button', 'sowb-btn');
+    next.type = 'button';
+    next.textContent = page === total - 1 ? 'Finish section' : 'Next';
+    next.setAttribute('data-next', '');
+    next.addEventListener('click', () => this.nextPage());
+    nav.appendChild(prev);
+    nav.appendChild(next);
+    wrap.appendChild(nav);
+    return wrap;
+  }
+
+  /** @param {import('@sowb/shared').Question} q */
+  _renderQuestion(q) {
+    const card = el('div', 'sowb-question');
+    const prompt = el('label', 'sowb-prompt');
+    prompt.id = 'lbl-' + q.id;
+    prompt.textContent = q.prompt;
+    if (q.required) {
+      const req = el('span', 'sowb-req');
+      req.textContent = ' *';
+      req.setAttribute('aria-hidden', 'true');
+      prompt.appendChild(req);
+    }
+    card.appendChild(prompt);
+
+    if (q.helpText) {
+      const help = el('p', 'sowb-help');
+      help.textContent = q.helpText;
+      card.appendChild(help);
+    }
+
+    card.appendChild(this._renderInput(q, this.state.responses[q.id]));
+
+    const info = this._answerStatus(q);
+    const status = el('div', 'sowb-answer-status ' + info.cls);
+    status.setAttribute('data-answer-status', '');
+    status.setAttribute('role', 'status');
+    status.textContent = info.text;
+    card.appendChild(status);
+    return card;
+  }
+
+  /** @param {import('@sowb/shared').Question} q @param {any} value */
+  _renderInput(q, value) {
+    const box = el('div', 'sowb-input');
+    const labelledby = 'lbl-' + q.id;
+    switch (q.type) {
+      case 'short_text': {
+        const input = /** @type {HTMLInputElement} */ (el('input', 'sowb-text'));
+        input.type = 'text'; input.value = value || '';
+        input.setAttribute('aria-labelledby', labelledby);
+        input.setAttribute('data-q', q.id);
+        input.addEventListener('input', () => this.setResponse(q.id, input.value));
+        box.appendChild(input);
+        break;
+      }
+      case 'long_text': {
+        const ta = /** @type {HTMLTextAreaElement} */ (el('textarea', 'sowb-textarea'));
+        ta.rows = 5; ta.value = value || '';
+        ta.setAttribute('aria-labelledby', labelledby);
+        ta.setAttribute('data-q', q.id);
+        ta.addEventListener('input', () => this.setResponse(q.id, ta.value));
+        box.appendChild(ta);
+        break;
+      }
+      case 'numeric': {
+        const input = /** @type {HTMLInputElement} */ (el('input', 'sowb-text sowb-numeric'));
+        input.type = 'number';
+        input.value = value === undefined || value === null ? '' : String(value);
+        if (isNum(q.min)) input.setAttribute('min', String(q.min));
+        if (isNum(q.max)) input.setAttribute('max', String(q.max));
+        input.setAttribute('step', q.integerOnly ? '1' : 'any');
+        input.setAttribute('inputmode', q.integerOnly ? 'numeric' : 'decimal');
+        input.setAttribute('aria-labelledby', labelledby);
+        input.setAttribute('data-q', q.id);
+        input.addEventListener('input', () => this.setResponse(q.id, input.value));
+        box.appendChild(input);
+        const rule = numericRuleText(q);
+        if (rule) {
+          const hint = el('div', 'sowb-rule');
+          hint.textContent = rule;
+          box.appendChild(hint);
+        }
+        break;
+      }
+      case 'url': {
+        const input = /** @type {HTMLInputElement} */ (el('input', 'sowb-text'));
+        input.type = 'url';
+        input.value = value || '';
+        input.setAttribute('placeholder', 'https://');
+        input.setAttribute('aria-labelledby', labelledby);
+        input.setAttribute('data-q', q.id);
+        input.addEventListener('input', () => this.setResponse(q.id, input.value));
+        box.appendChild(input);
+        // Clickable preview so a reviewer can follow the link.
+        const link = el('a', 'sowb-url-preview');
+        link.setAttribute('data-url-preview', '');
+        link.setAttribute('target', '_blank');
+        link.setAttribute('rel', 'noopener noreferrer');
+        const v = String(value || '').trim();
+        if (isValidHttpUrl(v)) { link.setAttribute('href', v); link.textContent = 'Open link'; }
+        else { link.style.display = 'none'; }
+        box.appendChild(link);
+        break;
+      }
+      case 'yes_no':
+        box.appendChild(this._radioGroup(q, ['yes', 'no'].map((v) => ({ id: v, label: cap(v) })), value, labelledby));
+        break;
+      case 'single_select':
+        box.appendChild(this._radioGroup(q, q.options || [], value, labelledby));
+        break;
+      case 'multiple_select':
+      case 'checklist':
+        box.appendChild(this._checkGroup(q, q.options || [], Array.isArray(value) ? value : [], labelledby));
+        break;
+      case 'rating':
+        box.appendChild(this._ratingGroup(q, value, labelledby));
+        break;
+      case 'datetime': {
+        const input = /** @type {HTMLInputElement} */ (el('input', 'sowb-text'));
+        input.type = 'date'; input.value = value || '';
+        input.setAttribute('aria-labelledby', labelledby);
+        input.setAttribute('data-q', q.id);
+        input.addEventListener('input', () => this.setResponse(q.id, input.value));
+        box.appendChild(input);
+        break;
+      }
+      case 'acknowledgement': {
+        const wrap = el('label', 'sowb-check');
+        const cb = /** @type {HTMLInputElement} */ (el('input'));
+        cb.type = 'checkbox'; cb.checked = value === true;
+        cb.setAttribute('data-q', q.id);
+        cb.addEventListener('change', () => this.setResponse(q.id, cb.checked));
+        const span = el('span'); span.textContent = 'I confirm I completed this activity.';
+        wrap.appendChild(cb); wrap.appendChild(span); box.appendChild(wrap);
+        break;
+      }
+      case 'evidence_ref':
+        box.appendChild(this._evidenceInput(q, value || {}, labelledby));
+        break;
+      default: {
+        const p = el('p', 'sowb-help');
+        p.textContent = `Unsupported question type: ${q.type}`;
+        box.appendChild(p);
+      }
+    }
+    return box;
+  }
+
+  _radioGroup(q, options, value, labelledby) {
+    const group = el('div', 'sowb-choices');
+    group.setAttribute('role', 'radiogroup');
+    group.setAttribute('aria-labelledby', labelledby);
+    options.forEach((opt) => {
+      const label = el('label', 'sowb-choice');
+      const input = /** @type {HTMLInputElement} */ (el('input'));
+      input.type = 'radio'; input.name = q.id; input.value = opt.id; input.checked = value === opt.id;
+      input.setAttribute('data-q', q.id);
+      input.addEventListener('change', () => this.setResponse(q.id, opt.id));
+      const span = el('span'); span.textContent = opt.label;
+      label.appendChild(input); label.appendChild(span); group.appendChild(label);
+    });
+    return group;
+  }
+
+  /**
+   * Checklist / multiple select. Options flagged `expected` are NOT visually
+   * distinguished: the learner must not be able to see which ones are required.
+   */
+  _checkGroup(q, options, values, labelledby) {
+    const group = el('div', 'sowb-choices');
+    group.setAttribute('role', 'group');
+    group.setAttribute('aria-labelledby', labelledby);
+    options.forEach((opt) => {
+      const label = el('label', 'sowb-choice');
+      const input = /** @type {HTMLInputElement} */ (el('input'));
+      input.type = 'checkbox'; input.value = opt.id; input.checked = values.includes(opt.id);
+      input.setAttribute('data-q', q.id);
+      input.addEventListener('change', () => {
+        const set = new Set(this.state.responses[q.id] || []);
+        if (input.checked) set.add(opt.id); else set.delete(opt.id);
+        this.setResponse(q.id, Array.from(set));
+      });
+      const span = el('span'); span.textContent = opt.label;
+      label.appendChild(input); label.appendChild(span); group.appendChild(label);
+    });
+    return group;
+  }
+
+  _ratingGroup(q, value, labelledby) {
+    const scale = q.scale && q.scale.length ? q.scale : [1, 2, 3, 4, 5];
+    const group = el('div', 'sowb-rating');
+    group.setAttribute('role', 'radiogroup');
+    group.setAttribute('aria-labelledby', labelledby);
+    scale.forEach((point) => {
+      const label = el('label', 'sowb-rating-item');
+      const input = /** @type {HTMLInputElement} */ (el('input'));
+      input.type = 'radio'; input.name = q.id; input.value = String(point);
+      input.checked = String(value) === String(point);
+      input.setAttribute('data-q', q.id);
+      input.addEventListener('change', () => this.setResponse(q.id, String(point)));
+      const span = el('span'); span.textContent = String(point);
+      label.appendChild(input); label.appendChild(span); group.appendChild(label);
+    });
+    return group;
+  }
+
+  _evidenceInput(q, value, labelledby) {
+    const box = el('div', 'sowb-evidence');
+    const note = el('p', 'sowb-help');
+    note.textContent = 'Select your proof-of-work file. Only the file name and type are recorded here; upload the actual file where your facilitator instructs.';
+    box.appendChild(note);
+    const input = /** @type {HTMLInputElement} */ (el('input'));
+    input.type = 'file';
+    input.setAttribute('aria-labelledby', labelledby);
+    input.addEventListener('change', () => {
+      const f = input.files && input.files[0];
+      const meta = f
+        ? { fileSelected: true, fileName: f.name, fileType: f.type || '', selectedDate: new Date().toISOString().slice(0, 10) }
+        : { fileSelected: false };
+      this.setResponse(q.id, meta);
+      this.render();
+    });
+    box.appendChild(input);
+    if (value && value.fileSelected) {
+      const chip = el('div', 'sowb-evidence-chip');
+      chip.textContent = `Recorded: ${value.fileName} (${value.fileType || 'unknown'}) on ${value.selectedDate}`;
+      box.appendChild(chip);
+    }
+    return box;
+  }
+
+  // ---- debug -------------------------------------------------------------
+
+  _renderDebug() {
+    const panel = el('aside', 'sowb-debug');
+    const h = el('div', 'sowb-debug-title');
+    h.textContent = 'SCORM debug panel' + (this.adapter.usingFallback ? ' (no LMS - fallback)' : ' (LMS connected)');
+    const body = el('pre', 'sowb-debug-body');
+    body.setAttribute('data-debug-body', '');
+    body.textContent = this._debugText();
+
+    const btns = el('div', 'sowb-debug-btns');
+    const exitBtn = el('button', 'sowb-btn ghost small');
+    exitBtn.type = 'button';
+    exitBtn.textContent = 'Exit + suspend';
+    exitBtn.setAttribute('data-exit', '');
+    exitBtn.addEventListener('click', () => {
+      this.session.suspendAndExit();
+      body.textContent = 'Session terminated + suspended. Reload to resume.\n\n' + this._debugText();
+    });
+    btns.appendChild(exitBtn);
+    panel.appendChild(h);
+    panel.appendChild(btns);
+    panel.appendChild(body);
+    return panel;
+  }
+
+  _debugText() {
+    return [
+      'completion_status: ' + this.adapter.getValue('cmi.completion_status'),
+      'progress_measure:  ' + this.adapter.getValue('cmi.progress_measure'),
+      'location:          ' + this.adapter.getValue('cmi.location'),
+      'entry:             ' + this.adapter.getValue('cmi.entry'),
+      'suspend bytes:     ' + this.session.suspendBytes(),
+      '',
+      'recent API calls:',
+      this.adapter.log.slice(-12).join('\n'),
+    ].join('\n');
+  }
+}
+
+// ---- helpers -------------------------------------------------------------
+
+function el(tag, cls) {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  return node;
+}
+function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+function isNum(v) { return v !== undefined && v !== null && v !== '' && isFinite(Number(v)); }
+
+/** Learner-visible statement of a numeric question's rule. */
+export function numericRuleText(q) {
+  const hasMin = isNum(q.min);
+  const hasMax = isNum(q.max);
+  const whole = q.integerOnly ? ' Whole numbers only.' : '';
+  if (hasMin && hasMax) return `Enter a value between ${q.min} and ${q.max}.${whole}`;
+  if (hasMin) return `Enter at least ${q.min}.${whole}`;
+  if (hasMax) return `Enter no more than ${q.max}.${whole}`;
+  return whole.trim();
+}

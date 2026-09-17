@@ -1,0 +1,7 @@
+{
+  "name": "@sowb/shared",
+  "version": "1.1.0",
+  "type": "module",
+  "main": "index.js",
+  "exports": { ".": "./index.js", "./constants.js": "./constants.js", "./ids.js": "./ids.js" }
+}
