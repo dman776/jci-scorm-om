@@ -1,0 +1,163 @@
+{
+  "id": "ascend-ae-install-ride-along",
+  "title": "AE Install Ride-Along Observation Workbook",
+  "description": "Field observation workbook for new Account Executives shadowing JCI install activities across their first three months.",
+  "version": "1.4",
+  "author": "JCI ASCEND Learning",
+  "courseId": "ascend-ae-install-ride-along",
+  "estimatedDuration": "3 months",
+  "settings": {
+    "language": "en-US",
+    "navigation": "free",
+    "completionRule": "all-required-sections",
+    "reportSuccess": false,
+    "dashboardHeading": "Your Milestones",
+    "allowPdfDownload": true
+  },
+  "sections": [
+    {
+      "id": "s1",
+      "title": "Month 1",
+      "required": true,
+      "questions": [
+        {
+          "id": "q_s1_1",
+          "type": "datetime",
+          "prompt": "Date of the install team meeting",
+          "required": true,
+          "helpText": "Use the date the meeting took place."
+        },
+        {
+          "id": "q_s1_2",
+          "type": "long_text",
+          "prompt": "What was discussed in the meeting?",
+          "required": true,
+          "helpText": "Summarize scope, safety, roles, and schedule."
+        },
+        {
+          "id": "q_s1_3",
+          "type": "checklist",
+          "prompt": "Which topics were covered?",
+          "required": true,
+          "helpText": "Check all that apply.",
+          "options": [
+            { "id": "o_scope", "label": "Scope review", "expected": true },
+            { "id": "o_safety", "label": "Safety plan", "expected": true },
+            { "id": "o_sched", "label": "Schedule" },
+            { "id": "o_cust", "label": "Customer expectations" }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "Month 2",
+      "required": true,
+      "questions": [
+        {
+          "id": "q_s2_1",
+          "type": "short_text",
+          "prompt": "Manager you shadowed",
+          "required": true
+        },
+        {
+          "id": "q_s2_2",
+          "type": "numeric",
+          "prompt": "How many install jobs did you review this month?",
+          "required": true,
+          "min": 4,
+          "integerOnly": true,
+          "helpText": "Review at least four jobs."
+        },
+        {
+          "id": "q_s2_3",
+          "type": "rating",
+          "prompt": "The install handoff process was clearly explained.",
+          "required": true,
+          "scaleId": "agreement-5"
+        },
+        {
+          "id": "q_s2_4",
+          "type": "rating",
+          "prompt": "How often did the team run a safety briefing?",
+          "required": true,
+          "scaleId": "frequency-5"
+        }
+      ]
+    },
+    {
+      "id": "s3",
+      "title": "Month 3",
+      "required": true,
+      "questions": [
+        {
+          "id": "q_s3_1",
+          "type": "yes_no",
+          "prompt": "Did you complete a full ride-along day?",
+          "required": true
+        },
+        {
+          "id": "q_s3_2",
+          "type": "rating",
+          "prompt": "Rate your understanding of on-site install steps",
+          "required": true,
+          "scaleId": "numeric-5",
+          "minLabel": "Not at all",
+          "maxLabel": "Expert"
+        },
+        {
+          "id": "q_s3_3",
+          "type": "url",
+          "prompt": "Link to your ride-along notes or photos",
+          "required": false,
+          "helpText": "Paste a SharePoint or Teams link starting with https://"
+        },
+        {
+          "id": "q_s3_4",
+          "type": "long_text",
+          "prompt": "Notes and observations from the ride along",
+          "required": false
+        }
+      ]
+    },
+    {
+      "id": "s4",
+      "title": "Wrap-Up",
+      "required": false,
+      "questions": [
+        {
+          "id": "q_s4_1",
+          "type": "acknowledgement",
+          "prompt": "I confirm I completed all ride-along activities",
+          "required": true
+        },
+        {
+          "id": "q_s4_2",
+          "type": "rating",
+          "prompt": "Confidence discussing scope with a customer",
+          "required": false,
+          "scaleId": "confidence-3"
+        },
+        {
+          "id": "q_s4_3",
+          "type": "single_select",
+          "prompt": "Which activity was most valuable?",
+          "required": false,
+          "helpText": "Pick the one that taught you the most.",
+          "options": [
+            { "id": "o_meeting", "label": "Install team meeting" },
+            { "id": "o_shadow", "label": "Manager shadow" },
+            { "id": "o_ride", "label": "Technician ride along" }
+          ]
+        },
+        {
+          "id": "q_s4_4",
+          "type": "evidence_ref",
+          "prompt": "Attach your completed observation checklist",
+          "required": false,
+          "helpText": "Only the file name and type are recorded here."
+        }
+      ]
+    }
+  ]
+}

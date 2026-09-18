@@ -1,0 +1,16 @@
+{
+  "version": 1,
+  "scales": [
+    {
+      "id": "jci-safety-adherence-4",
+      "name": "Safety Adherence (4-point)",
+      "description": "Observed adherence to safety procedures during a ride-along.",
+      "points": [
+        { "value": 1, "label": "Consistently followed" },
+        { "value": 2, "label": "Mostly followed" },
+        { "value": 3, "label": "Occasionally followed" },
+        { "value": 4, "label": "Did not follow" }
+      ]
+    }
+  ]
+}

@@ -11,11 +11,9 @@ import { buildManifest } from '../manifest.js';
 export const scorm2004Target = {
   id: 'scorm2004',
   label: 'SCORM 2004 4th Edition',
-
   async buildFileMap(workbook, opts = {}) {
     const runtime = await assembleRuntime(workbook, { debug: !!opts.debug });
     // The manifest must list every file in the package (except itself).
-    const manifest = buildManifest(workbook, Object.keys(runtime));
-    return { ...runtime, 'imsmanifest.xml': manifest };
+    return { ...runtime, 'imsmanifest.xml': buildManifest(workbook, Object.keys(runtime)) };
   },
 };

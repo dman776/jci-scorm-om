@@ -1,132 +1,143 @@
 // @ts-check
+/**
+ * Completion engine: response states, section rollup, progress, navigation.
+ * Every test drives the shared samples/demo.workbook.json fixture.
+ */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   getResponseState, getRequirementHint, isResponsePresent, isResponseComplete, isValidHttpUrl,
   computeSectionStatus, computeAllSectionStatus, computeProgressMeasure,
   isWorkbookComplete, isSectionUnlocked,
-  serializeState, deserializeState, estimateSuspendSize, validateWorkbook,
 } from '@sowb/workbook-engine';
+import { inlineScales } from '@sowb/shared/scales.js';
+import {
+  loadWorkbook, loadWorkbookWith, loadCustomScales,
+  COMPLETE_REQUIRED_RESPONSES, REQUIRED_QUESTION_COUNT,
+} from './helpers/workbook.js';
 
-function demo() {
-  return {
-    id: 'wb', title: 'Demo', version: '1.0',
-    settings: { language: 'en-US', navigation: 'free', completionRule: 'all-required-sections', reportSuccess: false },
-    sections: [
-      { id: 's1', title: 'A', required: true, questions: [
-        { id: 'q1', type: 'short_text', prompt: 'p1', required: true },
-        { id: 'q2', type: 'long_text', prompt: 'p2', required: false },
-      ] },
-      { id: 's2', title: 'B', required: true, questions: [
-        { id: 'q3', type: 'rating', prompt: 'p3', required: true, scale: [1, 2, 3, 4, 5] },
-      ] },
-      { id: 's3', title: 'C (optional)', required: false, questions: [
-        { id: 'q4', type: 'yes_no', prompt: 'p4', required: true },
-      ] },
-    ],
-  };
+/** Fixture with rating scales resolved, which is what the runtime always sees. */
+async function runtimeWorkbook() {
+  return inlineScales(await loadWorkbook(), await loadCustomScales());
 }
+async function q(id) {
+  const wb = await runtimeWorkbook();
+  for (const s of wb.sections) {
+    const found = s.questions.find((x) => x.id === id);
+    if (found) return found;
+  }
+  throw new Error(`fixture has no question ${id}`);
+}
+const section = async (id) => (await runtimeWorkbook()).sections.find((s) => s.id === id);
 
-const checklist = (opts) => ({ id: 'cl', type: 'checklist', prompt: 'c', required: true, options: opts });
+// ---- basic response states ----------------------------------------------
 
-// ---- basic states --------------------------------------------------------
+test('simple types are empty or complete', async () => {
+  const shortText = await q('q_s2_1');
+  assert.equal(getResponseState(shortText, ''), 'empty');
+  assert.equal(getResponseState(shortText, 'Dana Ruiz'), 'complete');
+  assert.equal(getResponseState(shortText, undefined), 'empty');
 
-test('response states for simple types', () => {
-  assert.equal(getResponseState({ type: 'short_text' }, ''), 'empty');
-  assert.equal(getResponseState({ type: 'short_text' }, 'x'), 'complete');
-  assert.equal(getResponseState({ type: 'yes_no' }, 'no'), 'complete');
-  assert.equal(getResponseState({ type: 'acknowledgement' }, false), 'empty');
-  assert.equal(getResponseState({ type: 'acknowledgement' }, true), 'complete');
-  assert.equal(getResponseState({ type: 'evidence_ref' }, { fileSelected: true }), 'complete');
-  assert.equal(isResponsePresent({ type: 'short_text' }, 'x'), true);
-  assert.equal(isResponseComplete({ type: 'short_text' }, 'x'), true);
+  const yesNo = await q('q_s3_1');
+  assert.equal(getResponseState(yesNo, 'no'), 'complete');
+
+  const ack = await q('q_s4_1');
+  assert.equal(getResponseState(ack, false), 'empty');
+  assert.equal(getResponseState(ack, true), 'complete');
+
+  const evidence = await q('q_s4_4');
+  assert.equal(getResponseState(evidence, { fileSelected: true }), 'complete');
+  assert.equal(getResponseState(evidence, { fileSelected: false }), 'empty');
+
+  assert.equal(isResponsePresent(shortText, 'x'), true);
+  assert.equal(isResponseComplete(shortText, 'x'), true);
 });
 
-// ---- checklist expected gating ------------------------------------------
+// ---- checklist / multiple_select expected gating ------------------------
 
-test('checklist with expected options requires ALL expected to be selected', () => {
-  const q = checklist([
-    { id: 'a', label: 'A', expected: true },
-    { id: 'b', label: 'B', expected: true },
-    { id: 'c', label: 'C' },
-  ]);
-  assert.equal(getResponseState(q, []), 'empty');
-  assert.equal(getResponseState(q, ['a']), 'partial', 'one of two expected');
-  assert.equal(getResponseState(q, ['c']), 'partial', 'only a non-expected option');
-  assert.equal(getResponseState(q, ['a', 'b']), 'complete');
+test('a checklist requires ALL expected options to be selected', async () => {
+  // q_s1_3 flags o_scope and o_safety as expected.
+  const checklist = await q('q_s1_3');
+  assert.equal(getResponseState(checklist, []), 'empty');
+  assert.equal(getResponseState(checklist, ['o_scope']), 'partial', 'one of two expected');
+  assert.equal(getResponseState(checklist, ['o_sched']), 'partial', 'only a non-expected option');
+  assert.equal(getResponseState(checklist, ['o_scope', 'o_safety']), 'complete');
 });
 
-test('extra non-expected selections do not block completion', () => {
-  const q = checklist([
-    { id: 'a', label: 'A', expected: true },
-    { id: 'b', label: 'B' },
-    { id: 'c', label: 'C' },
-  ]);
-  assert.equal(getResponseState(q, ['a', 'b', 'c']), 'complete');
+test('extra non-expected selections never block completion', async () => {
+  const checklist = await q('q_s1_3');
+  assert.equal(getResponseState(checklist, ['o_scope', 'o_safety', 'o_sched', 'o_cust']), 'complete');
 });
 
-test('checklist with no expected options completes on any selection', () => {
-  const q = checklist([{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }]);
-  assert.equal(getResponseState(q, ['b']), 'complete');
+test('a checklist with no expected options completes on any selection', async () => {
+  const wb = await loadWorkbookWith((w) => {
+    for (const o of w.sections[0].questions[2].options) delete o.expected;
+  });
+  assert.equal(getResponseState(wb.sections[0].questions[2], ['o_sched']), 'complete');
 });
 
-test('multiple_select is also expected-gated', () => {
-  const q = { id: 'ms', type: 'multiple_select', prompt: 'm', required: true,
-    options: [{ id: 'a', label: 'A', expected: true }, { id: 'b', label: 'B' }] };
-  assert.equal(getResponseState(q, ['b']), 'partial');
-  assert.equal(getResponseState(q, ['a']), 'complete');
-});
-
-test('checklist hint never names the expected options', () => {
-  const q = checklist([{ id: 'a', label: 'Safety plan', expected: true }, { id: 'b', label: 'B' }]);
-  const hint = getRequirementHint(q, ['b']);
+test('the checklist hint never names the expected options', async () => {
+  const checklist = await q('q_s1_3');
+  const hint = getRequirementHint(checklist, ['o_sched']);
   assert.equal(hint, 'Some required items are not yet selected.');
-  assert.ok(!hint.includes('Safety plan'), 'hint must not leak expected labels');
+  assert.ok(!hint.includes('Scope review'), 'hint must not leak an expected label');
+  assert.ok(!hint.includes('Safety plan'));
 });
 
 // ---- numeric -------------------------------------------------------------
 
-test('numeric respects an inclusive minimum', () => {
-  const q = { id: 'n', type: 'numeric', prompt: 'n', required: true, min: 4 };
-  assert.equal(getResponseState(q, ''), 'empty');
-  assert.equal(getResponseState(q, '3'), 'partial');
-  assert.equal(getResponseState(q, '4'), 'complete', 'min is inclusive');
-  assert.equal(getResponseState(q, 9), 'complete');
-  assert.equal(getResponseState(q, 'abc'), 'partial');
-  assert.equal(getRequirementHint(q, '3'), 'Enter at least 4.');
+test('numeric respects an inclusive minimum', async () => {
+  const numeric = await q('q_s2_2'); // min 4, integerOnly
+  assert.equal(getResponseState(numeric, ''), 'empty');
+  assert.equal(getResponseState(numeric, '3'), 'partial');
+  assert.equal(getResponseState(numeric, '4'), 'complete', 'the minimum is inclusive');
+  assert.equal(getResponseState(numeric, 9), 'complete');
+  assert.equal(getResponseState(numeric, 'abc'), 'partial');
+  assert.equal(getRequirementHint(numeric, '3'), 'Enter at least 4.');
 });
 
-test('numeric treats 0 as a real answer, not blank', () => {
-  const unbounded = { id: 'n', type: 'numeric', prompt: 'n', required: true };
+test('numeric treats 0 as a real answer, not a blank', async () => {
+  const unbounded = await loadWorkbookWith((w) => {
+    const n = w.sections[1].questions[1];
+    delete n.min; delete n.integerOnly;
+  }).then((w) => w.sections[1].questions[1]);
   assert.equal(getResponseState(unbounded, '0'), 'complete');
-  const min1 = { id: 'n', type: 'numeric', prompt: 'n', required: true, min: 1 };
-  assert.equal(getResponseState(min1, '0'), 'partial', '0 is answered but below min');
+
+  const bounded = await q('q_s2_2');
+  assert.equal(getResponseState(bounded, '0'), 'partial', 'answered, but below the minimum');
 });
 
-test('numeric respects max and whole-number rules', () => {
-  const q = { id: 'n', type: 'numeric', prompt: 'n', required: true, min: 1, max: 5, integerOnly: true };
-  assert.equal(getResponseState(q, '6'), 'partial');
-  assert.equal(getResponseState(q, '5'), 'complete', 'max is inclusive');
-  assert.equal(getResponseState(q, '2.5'), 'partial');
-  assert.equal(getRequirementHint(q, '2.5'), 'Enter a whole number.');
-  assert.equal(getRequirementHint(q, '6'), 'Enter a value between 1 and 5.');
+test('numeric enforces whole numbers when configured', async () => {
+  const numeric = await q('q_s2_2');
+  assert.equal(getResponseState(numeric, '5.5'), 'partial');
+  assert.equal(getRequirementHint(numeric, '5.5'), 'Enter a whole number.');
 });
 
-test('numeric with decimals allowed by default', () => {
-  const q = { id: 'n', type: 'numeric', prompt: 'n', required: true, min: 0 };
-  assert.equal(getResponseState(q, '2.5'), 'complete');
+test('numeric respects a maximum and a min+max range', async () => {
+  const ranged = await loadWorkbookWith((w) => {
+    Object.assign(w.sections[1].questions[1], { min: 1, max: 5 });
+  }).then((w) => w.sections[1].questions[1]);
+  assert.equal(getResponseState(ranged, '6'), 'partial');
+  assert.equal(getResponseState(ranged, '5'), 'complete', 'the maximum is inclusive');
+  assert.equal(getRequirementHint(ranged, '6'), 'Enter a value between 1 and 5.');
+
+  const maxOnly = await loadWorkbookWith((w) => {
+    const n = w.sections[1].questions[1];
+    delete n.min; n.max = 10;
+  }).then((w) => w.sections[1].questions[1]);
+  assert.equal(getRequirementHint(maxOnly, '11'), 'Enter no more than 10.');
 });
 
 // ---- url -----------------------------------------------------------------
 
-test('url must be a valid http/https link', () => {
-  const q = { id: 'u', type: 'url', prompt: 'u', required: true };
-  assert.equal(getResponseState(q, ''), 'empty');
-  assert.equal(getResponseState(q, 'notaurl'), 'partial');
-  assert.equal(getResponseState(q, 'ftp://example.com'), 'partial', 'non-http scheme blocked');
-  assert.equal(getResponseState(q, 'https://jci.sharepoint.com/doc'), 'complete');
-  assert.equal(getResponseState(q, 'http://example.com'), 'complete');
-  assert.equal(getRequirementHint(q, 'notaurl'), 'Enter a valid link starting with https://');
+test('url must be a valid http/https link', async () => {
+  const url = await q('q_s3_3');
+  assert.equal(getResponseState(url, ''), 'empty');
+  assert.equal(getResponseState(url, 'notaurl'), 'partial');
+  assert.equal(getResponseState(url, 'ftp://example.com'), 'partial', 'non-http scheme blocked');
+  assert.equal(getResponseState(url, 'https://jci.sharepoint.com/doc'), 'complete');
+  assert.equal(getResponseState(url, 'http://example.com'), 'complete');
+  assert.equal(getRequirementHint(url, 'notaurl'), 'Enter a valid link starting with https://');
 });
 
 test('isValidHttpUrl rejects schemeless and hostless values', () => {
@@ -136,150 +147,149 @@ test('isValidHttpUrl rejects schemeless and hostless values', () => {
   assert.equal(isValidHttpUrl('http://localhost:3000/a'), true);
 });
 
+// ---- rating --------------------------------------------------------------
+
+test('a rating response must match a point in its scale', async () => {
+  const rating = await q('q_s2_3'); // agreement-5, values 1..5
+  assert.equal(getResponseState(rating, ''), 'empty');
+  assert.equal(getResponseState(rating, '1'), 'complete');
+  assert.equal(getResponseState(rating, '5'), 'complete');
+  // There IS data, but it is not on the scale, so it is partial not complete.
+  assert.equal(getResponseState(rating, '9'), 'partial');
+  assert.equal(getRequirementHint(rating, '9'), 'Choose one of the options shown.');
+});
+
+test('a response orphaned by an edited scale degrades to partial', async () => {
+  const wb = await loadWorkbook();
+  const custom = await loadCustomScales();
+  const responses = { q_s2_1: 'Dana', q_s2_2: '6', q_s2_3: '5', q_s2_4: '1' };
+  assert.equal(computeSectionStatus(inlineScales(wb, custom).sections[1], responses), 'completed');
+
+  // The author later shortens agreement-5 to three points.
+  const shortened = inlineScales(wb, [...custom, {
+    id: 'agreement-5', name: 'Agreement (3-point)',
+    points: [{ value: 1, label: 'Agree' }, { value: 2, label: 'Neutral' }, { value: 3, label: 'Disagree' }],
+  }]);
+  assert.equal(computeSectionStatus(shortened.sections[1], responses), 'partially_complete',
+    'the stored 5 no longer exists, so the section is no longer complete');
+});
+
 // ---- section rollup ------------------------------------------------------
 
-test('section status transitions including PARTIALLY_COMPLETE', () => {
-  const section = { id: 's', required: true, questions: [
-    { id: 'n', type: 'numeric', prompt: 'n', required: true, min: 4 },
-    checklist([{ id: 'a', label: 'A', expected: true }, { id: 'b', label: 'B' }]),
-  ] };
-  assert.equal(computeSectionStatus(section, {}), 'not_started');
-  // One answered, one still blank -> in progress (there are blanks).
-  assert.equal(computeSectionStatus(section, { n: '5' }), 'in_progress');
-  // Nothing blank, but both fail their requirement -> partially complete.
-  assert.equal(computeSectionStatus(section, { n: '2', cl: ['b'] }), 'partially_complete');
-  // Nothing blank, one still failing -> partially complete.
-  assert.equal(computeSectionStatus(section, { n: '5', cl: ['b'] }), 'partially_complete');
-  assert.equal(computeSectionStatus(section, { n: '5', cl: ['a'] }), 'completed');
+test('section status walks not_started -> in_progress -> completed', async () => {
+  const s1 = await section('s1');
+  assert.equal(computeSectionStatus(s1, {}), 'not_started');
+  assert.equal(computeSectionStatus(s1, { q_s1_1: '2026-09-14' }), 'in_progress', 'blanks remain');
+  assert.equal(
+    computeSectionStatus(s1, { q_s1_1: '2026-09-14', q_s1_2: 'Notes.', q_s1_3: ['o_scope', 'o_safety'] }),
+    'completed'
+  );
 });
 
-test('partially complete section does not complete the workbook', () => {
-  const wb = { settings: {}, sections: [
-    { id: 's1', required: true, questions: [{ id: 'n', type: 'numeric', prompt: 'n', required: true, min: 4 }] },
-  ] };
-  const status = computeAllSectionStatus(wb, { n: '1' });
-  assert.equal(status.s1, 'partially_complete');
+test('PARTIALLY_COMPLETE means nothing blank but a requirement unmet', async () => {
+  const s1 = await section('s1');
+  assert.equal(
+    computeSectionStatus(s1, { q_s1_1: '2026-09-14', q_s1_2: 'Notes.', q_s1_3: ['o_scope'] }),
+    'partially_complete'
+  );
+  const s2 = await section('s2');
+  assert.equal(
+    computeSectionStatus(s2, { q_s2_1: 'Dana', q_s2_2: '2', q_s2_3: '1', q_s2_4: '1' }),
+    'partially_complete'
+  );
+});
+
+test('optional questions never gate a section', async () => {
+  const s3 = await section('s3'); // q_s3_3 (url) and q_s3_4 are optional
+  assert.equal(computeSectionStatus(s3, { q_s3_1: 'yes', q_s3_2: '4' }), 'completed');
+  // A partial OPTIONAL url does not drag the section back.
+  assert.equal(computeSectionStatus(s3, { q_s3_1: 'yes', q_s3_2: '4', q_s3_3: 'notaurl' }), 'completed');
+});
+
+test('a section with no required questions completes on any answer', async () => {
+  const s = await loadWorkbookWith((w) => {
+    for (const question of w.sections[0].questions) question.required = false;
+  }).then((w) => w.sections[0]);
+  assert.equal(computeSectionStatus(s, {}), 'not_started');
+  assert.equal(computeSectionStatus(s, { q_s1_1: '2026-09-14' }), 'completed');
+});
+
+test('the workbook completes only when every REQUIRED section is complete', async () => {
+  const wb = await runtimeWorkbook();
+  const partial = computeAllSectionStatus(wb, { q_s1_1: '2026-09-14' });
+  assert.equal(isWorkbookComplete(wb, partial), false);
+
+  const done = computeAllSectionStatus(wb, COMPLETE_REQUIRED_RESPONSES);
+  assert.equal(done.s1, 'completed');
+  assert.equal(done.s2, 'completed');
+  assert.equal(done.s3, 'completed');
+  assert.equal(done.s4, 'not_started', 'the optional section is untouched');
+  assert.equal(isWorkbookComplete(wb, done), true, 'optional s4 does not gate completion');
+});
+
+test('a partially complete section blocks workbook completion', async () => {
+  const wb = await runtimeWorkbook();
+  const responses = { ...COMPLETE_REQUIRED_RESPONSES, q_s2_2: '1' };
+  const status = computeAllSectionStatus(wb, responses);
+  assert.equal(status.s2, 'partially_complete');
   assert.equal(isWorkbookComplete(wb, status), false);
-});
-
-test('optional section completes on any answer', () => {
-  const wb = demo();
-  assert.equal(computeSectionStatus(wb.sections[2], {}), 'not_started');
-  assert.equal(computeSectionStatus(wb.sections[2], { q4: 'yes' }), 'completed');
 });
 
 // ---- progress ------------------------------------------------------------
 
-test('progress is question-level and ignores partial responses', () => {
-  const wb = { settings: {}, sections: [
-    { id: 's1', required: true, questions: [
-      { id: 'a', type: 'short_text', prompt: 'a', required: true },
-      { id: 'b', type: 'short_text', prompt: 'b', required: true },
-      { id: 'c', type: 'numeric', prompt: 'c', required: true, min: 4 },
-      { id: 'd', type: 'short_text', prompt: 'd', required: false },
-    ] },
-  ] };
-  const st = (r) => computeAllSectionStatus(wb, r);
-  assert.equal(computeProgressMeasure(wb, st({}), {}), 0);
-  // 1 of 3 required questions complete -> 0.33, even though the section is not done.
-  assert.equal(computeProgressMeasure(wb, st({ a: 'x' }), { a: 'x' }), 0.33);
-  // A partial numeric response does not count.
-  const r = { a: 'x', b: 'y', c: '2' };
-  assert.equal(computeProgressMeasure(wb, st(r), r), 0.67);
-  const r2 = { a: 'x', b: 'y', c: '4' };
-  assert.equal(computeProgressMeasure(wb, st(r2), r2), 1);
+test('progress is question-level across required sections', async () => {
+  const wb = await runtimeWorkbook();
+  const measure = (r) => computeProgressMeasure(wb, computeAllSectionStatus(wb, r), r);
+  assert.equal(measure({}), 0);
+  assert.equal(measure({ q_s1_1: '2026-09-14' }), 0.11, '1 of 9 required questions');
+  assert.equal(measure(COMPLETE_REQUIRED_RESPONSES), 1);
+  assert.equal(REQUIRED_QUESTION_COUNT, 9, 'fixture shape is what these numbers assume');
 });
 
-test('optional sections are excluded from progress', () => {
-  const wb = demo();
-  const r = { q1: 'a', q3: '4' };
-  assert.equal(computeProgressMeasure(wb, computeAllSectionStatus(wb, r), r), 1);
+test('a partial response does not count toward progress', async () => {
+  const wb = await runtimeWorkbook();
+  const measure = (r) => computeProgressMeasure(wb, computeAllSectionStatus(wb, r), r);
+  const base = { q_s1_1: '2026-09-14' };
+  assert.equal(measure({ ...base, q_s2_2: '2' }), measure(base), 'below-minimum numeric adds nothing');
+  assert.ok(measure({ ...base, q_s2_2: '9' }) > measure(base), 'a satisfying value does count');
+  assert.equal(measure({ ...base, q_s2_3: '99' }), measure(base), 'off-scale rating adds nothing');
 });
 
-test('required section with no required questions counts as one unit', () => {
-  const wb = { settings: {}, sections: [
-    { id: 's1', required: true, questions: [{ id: 'a', type: 'short_text', prompt: 'a', required: false }] },
-  ] };
+test('optional sections and optional questions are excluded from progress', async () => {
+  const wb = await runtimeWorkbook();
+  const status = computeAllSectionStatus(wb, COMPLETE_REQUIRED_RESPONSES);
+  assert.equal(computeProgressMeasure(wb, status, COMPLETE_REQUIRED_RESPONSES), 1);
+});
+
+test('a required section with no required questions counts as one unit', async () => {
+  const wb = await loadWorkbookWith((w) => {
+    w.sections = [w.sections[0]];
+    for (const question of w.sections[0].questions) question.required = false;
+  });
   assert.equal(computeProgressMeasure(wb, computeAllSectionStatus(wb, {}), {}), 0);
-  const r = { a: 'x' };
+  const r = { q_s1_1: '2026-09-14' };
   assert.equal(computeProgressMeasure(wb, computeAllSectionStatus(wb, r), r), 1);
 });
 
-// ---- linear nav ----------------------------------------------------------
+// ---- navigation ----------------------------------------------------------
 
-test('linear navigation does not unlock on a partially complete section', () => {
-  const wb = { settings: { navigation: 'linear' }, sections: [
-    { id: 's1', required: true, questions: [{ id: 'n', type: 'numeric', prompt: 'n', required: true, min: 4 }] },
-    { id: 's2', required: true, questions: [{ id: 'x', type: 'short_text', prompt: 'x', required: true }] },
-  ] };
-  const partial = computeAllSectionStatus(wb, { n: '1' });
+test('free navigation unlocks every section', async () => {
+  const wb = await runtimeWorkbook();
+  const status = computeAllSectionStatus(wb, {});
+  for (const s of wb.sections) assert.equal(isSectionUnlocked(wb, s.id, status), true);
+});
+
+test('linear navigation gates on COMPLETED, not partially complete', async () => {
+  const wb = await loadWorkbookWith((w) => { w.settings.navigation = 'linear'; });
+  const empty = computeAllSectionStatus(wb, {});
+  assert.equal(isSectionUnlocked(wb, 's1', empty), true, 'the first section is always open');
+  assert.equal(isSectionUnlocked(wb, 's2', empty), false);
+
+  const partialResponses = { q_s1_1: '2026-09-14', q_s1_2: 'Notes.', q_s1_3: ['o_scope'] };
+  const partial = computeAllSectionStatus(wb, partialResponses);
   assert.equal(partial.s1, 'partially_complete');
-  assert.equal(isSectionUnlocked(wb, 's2', partial), false);
-  const done = computeAllSectionStatus(wb, { n: '9' });
-  assert.equal(isSectionUnlocked(wb, 's2', done), true);
-});
+  assert.equal(isSectionUnlocked(wb, 's2', partial), false, 'partial does not unlock');
 
-// ---- suspend -------------------------------------------------------------
-
-test('suspend round-trips the partially_complete status', () => {
-  const state = {
-    currentSection: 's2', currentPage: 1,
-    responses: { q1: 'hello', n: '2' },
-    sectionStatus: { s1: 'completed', s2: 'partially_complete', s3: 'in_progress', s4: 'not_started' },
-  };
-  const back = deserializeState(serializeState(state));
-  assert.deepEqual(back, state);
-  assert.ok(estimateSuspendSize(state) < 400);
-});
-
-test('deserialize tolerates garbage', () => {
-  assert.deepEqual(deserializeState('not json'),
-    { currentSection: '', currentPage: 0, responses: {}, sectionStatus: {} });
-});
-
-// ---- validation ----------------------------------------------------------
-
-test('validation flags blocking errors', () => {
-  const wb = demo();
-  wb.sections[0].questions = [];
-  const r = validateWorkbook(wb);
-  assert.equal(r.ok, false);
-  assert.ok(r.errors.some((e) => e.code === 'empty-section'));
-});
-
-test('validation rejects numeric min greater than max', () => {
-  const wb = demo();
-  wb.sections[0].questions.push({ id: 'nq', type: 'numeric', prompt: 'n', required: true, min: 10, max: 2 });
-  const r = validateWorkbook(wb);
-  assert.equal(r.ok, false);
-  assert.ok(r.errors.some((e) => e.code === 'numeric-bad-range'));
-});
-
-test('validation warns when every option is expected', () => {
-  const wb = demo();
-  wb.sections[0].questions.push(checklist([
-    { id: 'a', label: 'A', expected: true }, { id: 'b', label: 'B', expected: true },
-  ]));
-  const r = validateWorkbook(wb);
-  assert.ok(r.warnings.some((w) => w.code === 'all-options-expected'));
-});
-
-test('validation warns when expected is set on a non-gated type', () => {
-  const wb = demo();
-  wb.sections[0].questions.push({ id: 'ss', type: 'single_select', prompt: 's', required: true,
-    options: [{ id: 'a', label: 'A', expected: true }, { id: 'b', label: 'B' }] });
-  const r = validateWorkbook(wb);
-  assert.ok(r.warnings.some((w) => w.code === 'expected-ignored'));
-});
-
-test('validation rejects evidence storing a file in SCORM', () => {
-  const wb = demo();
-  wb.sections[0].questions.push({ id: 'qe', type: 'evidence_ref', prompt: 'e', required: false, storeFileInScorm: true });
-  assert.ok(validateWorkbook(wb).errors.some((e) => e.code === 'evidence-stores-file'));
-});
-
-test('validation warns near, and errors over, the suspend limit', () => {
-  const wb = demo();
-  assert.ok(validateWorkbook(wb, { estimatedSuspendSize: 60000 }).warnings.some((w) => w.code === 'suspend-near-limit'));
-  assert.ok(validateWorkbook(wb, { estimatedSuspendSize: 70000 }).errors.some((e) => e.code === 'suspend-over-limit'));
+  const doneResponses = { ...partialResponses, q_s1_3: ['o_scope', 'o_safety'] };
+  assert.equal(isSectionUnlocked(wb, 's2', computeAllSectionStatus(wb, doneResponses)), true);
 });

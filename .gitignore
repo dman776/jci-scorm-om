@@ -1,7 +1,4 @@
 node_modules/
-dist/
-data/
-release/
 *.log
 .DS_Store
 data/workbooks/*.json

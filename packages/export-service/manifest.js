@@ -4,28 +4,20 @@
  *
  * Emits a single-SCO content package conforming to the SCORM 2004 4th Edition
  * Content Aggregation Model: IMS Content Packaging 1.1.4 plus the ADL SCORM
- * namespaces and IMS Simple Sequencing (imsss).
- */
-
-/**
- * @param {import('@sowb/shared').Workbook} workbook
- * @param {string[]} resourceFiles Relative file paths included in the package.
- * @returns {string} imsmanifest.xml content
+ * namespaces and IMS Simple Sequencing. One organization, one item, one SCO
+ * resource whose entry point is index.html.
  */
 export function buildManifest(workbook, resourceFiles) {
   const courseId = safeId(workbook.courseId || workbook.id || 'observation-workbook');
-  const manifestId = `MANIFEST-${courseId}`;
-  const orgId = `ORG-${courseId}`;
-  const itemId = `ITEM-${courseId}`;
-  const resId = `RES-${courseId}`;
   const title = xml(workbook.title || 'Observation Workbook');
   const version = xml(workbook.version || '1.0');
-
   const fileEntries = resourceFiles.slice().sort()
     .map((f) => `        <file href="${xmlAttr(f)}" />`).join('\n');
 
+  // completionThreshold + a simple objective make the intended completion
+  // semantics explicit to the LMS sequencer.
   return `<?xml version="1.0" encoding="UTF-8"?>
-<manifest identifier="${xmlAttr(manifestId)}" version="${version}"
+<manifest identifier="${xmlAttr('MANIFEST-' + courseId)}" version="${version}"
   xmlns="http://www.imsglobal.org/xsd/imscp_v1p1"
   xmlns:adlcp="http://www.adlnet.org/xsd/adlcp_v1p3"
   xmlns:adlseq="http://www.adlnet.org/xsd/adlseq_v1p3"
@@ -41,10 +33,10 @@ export function buildManifest(workbook, resourceFiles) {
     <schema>ADL SCORM</schema>
     <schemaversion>2004 4th Edition</schemaversion>
   </metadata>
-  <organizations default="${xmlAttr(orgId)}">
-    <organization identifier="${xmlAttr(orgId)}" adlseq:objectivesGlobalToSystem="false">
+  <organizations default="${xmlAttr('ORG-' + courseId)}">
+    <organization identifier="${xmlAttr('ORG-' + courseId)}" adlseq:objectivesGlobalToSystem="false">
       <title>${title}</title>
-      <item identifier="${xmlAttr(itemId)}" identifierref="${xmlAttr(resId)}" isvisible="true">
+      <item identifier="${xmlAttr('ITEM-' + courseId)}" identifierref="${xmlAttr('RES-' + courseId)}" isvisible="true">
         <title>${title}</title>
         <adlcp:completionThreshold completedByMeasure="true" minProgressMeasure="1.0" />
         <imsss:sequencing>
@@ -60,7 +52,7 @@ export function buildManifest(workbook, resourceFiles) {
     </organization>
   </organizations>
   <resources>
-    <resource identifier="${xmlAttr(resId)}" type="webcontent"
+    <resource identifier="${xmlAttr('RES-' + courseId)}" type="webcontent"
       adlcp:scormType="sco" href="index.html">
 ${fileEntries}
     </resource>
@@ -68,13 +60,6 @@ ${fileEntries}
 </manifest>
 `;
 }
-
-function safeId(s) {
-  return String(s).replace(/[^A-Za-z0-9._-]/g, '-').replace(/^-+|-+$/g, '') || 'workbook';
-}
-function xml(s) {
-  return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
-}
-function xmlAttr(s) {
-  return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-}
+function safeId(s) { return String(s).replace(/[^A-Za-z0-9._-]/g, '-').replace(/^-+|-+$/g, '') || 'workbook'; }
+function xml(s) { return String(s).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c])); }
+function xmlAttr(s) { return String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }

@@ -2,7 +2,7 @@
 
 Author digital **observation workbooks** (ride-alongs, shadowing sessions, install-team meetings, field observations) through a visual UI, then export each one as a **self-contained SCORM 2004 4th Edition** package you upload to Workday Learning.
 
-Learners complete a workbook progressively over days or weeks, can exit at any time with **no data loss**, and on resume **always return to the section list to choose which section to continue**. Responses auto-save to the LMS after every page and every change.
+Learners complete a workbook progressively over days or weeks, can exit at any time with **no data loss**, resume to the section list, and download a PDF of their own responses.
 
 Built by Darryl Quinn.
 
@@ -16,35 +16,32 @@ npm install          # sets up workspaces; installs jszip + nanoid
 npm start            # authoring app at http://127.0.0.1:4173/
 ```
 
-Then open **http://127.0.0.1:4173/** and:
-
-1. **Workbook Settings** - title, version, course id, language, dashboard heading, navigation, completion behavior.
-2. **Sections** - add sections (Required/Optional), then add observation questions.
-3. **Preview** - run the real runtime against a mock LMS; test **Exit + resume**.
-4. **Publish** - validate, then **Build SCORM ZIP** and download.
-
-Other scripts:
+1. **Workbook Settings** — title, version, course id, dashboard heading, PDF download, navigation.
+2. **Sections** — add sections (Required/Optional), then add observation questions.
+3. **Rating Scales** — manage the reusable scale library.
+4. **Preview** — run the real runtime against a mock LMS; test Exit + resume.
+5. **Publish** — validate, then **Build SCORM ZIP**.
 
 ```bash
+npm test                 # 122 tests
 npm run build:template   # writes samples/template.xlsx
-npm run export:demo      # builds out/<course>_SCORM2004.zip from the demo workbook
-npm test                 # Node test runner (51 tests)
-npm run typecheck        # tsc --noEmit over the JSDoc-typed sources
-npm run test:e2e         # Playwright learner spec (see "End-to-end tests")
+npm run export:demo      # builds out/<course>_SCORM2004.zip
+npm run typecheck        # tsc --noEmit
+npm run test:e2e         # Playwright learner spec (see below)
 ```
 
-> Offline/air-gapped note: only two runtime dependencies are used (`jszip`, `nanoid`). If you cannot reach the npm registry, vendor those two into `node_modules/` and create `node_modules/@sowb/*` symlinks to each `packages/*` folder; the app then runs from a fresh clone with only Node installed.
+> **Offline note:** only two runtime dependencies (`jszip`, `nanoid`), both build-time only. If you cannot reach the npm registry, vendor those two into `node_modules/` and symlink `node_modules/@sowb/*` to each `packages/*` folder.
 
 ---
 
 ## Completion state model
 
-A question is not simply answered or unanswered. It has **three states**, because a response can exist and still fail its requirement:
+A question has **three states**, because a response can exist and still fail its requirement:
 
 | State | Meaning |
 |---|---|
 | **Empty** | No response at all |
-| **Partial** | A response exists but the requirement is unmet (numeric outside min/max, checklist missing an expected option, malformed link) |
+| **Partial** | A response exists but the requirement is unmet |
 | **Complete** | Response exists and satisfies the requirement. Only these count. |
 
 Sections roll that up into **four states**:
@@ -56,159 +53,158 @@ Sections roll that up into **four states**:
 | **Partially Complete** | Nothing is blank, but a required question does not meet its requirement |
 | **Completed** | Every required question is complete |
 
-The useful distinction: *In Progress* means you still have blanks; *Partially Complete* means you filled everything in but fell short of a requirement. They need different coaching.
+*In Progress* means you still have blanks; *Partially Complete* means you filled everything in but fell short. They need different coaching.
 
-**SCORM caveat:** SCORM 2004 has no "partial" `cmi.completion_status` (only completed / incomplete / unknown), so a partially complete section still reports the workbook as `incomplete` to Workday Learning. The nuance lives in the learner dashboard (orange status), the progress measure, and the authoring UI.
+**SCORM caveat:** SCORM 2004 has no "partial" `cmi.completion_status` (only completed / incomplete / unknown), so a partially complete section still reports the workbook as `incomplete`. The nuance lives in the learner dashboard (orange), the progress measure, and the authoring UI.
 
-### Progress measure
-
-`cmi.progress_measure` is **question-level**: it counts required questions that are complete, across required sections, so the bar moves as the learner works. Partial responses do not count. A required section with no required questions contributes a single unit, satisfied when the section completes.
+`cmi.progress_measure` is **question-level**: it counts required questions that are complete across required sections, so the bar moves as the learner works. Partial responses do not count.
 
 ---
 
 ## Completion rules by type
 
-**Checklist / multiple select - expected options.** Tick **Expected** next to any option the learner must select. The question completes only when **every** expected option is checked. Extra, non-expected selections are allowed and never block completion. If no options are marked Expected, any selection completes the question.
+**Checklist / multiple select — expected options.** Tick **Expected** next to any option the learner must select. The question completes only when **every** expected option is checked; extra selections are allowed. Expected options are never marked in the learner runtime, and the unmet hint is neutral: *"Some required items are not yet selected."*
 
-Expected options are **never visually marked in the learner runtime**, so learners cannot see which boxes are required. On an unmet requirement they see a neutral hint: *"Some required items are not yet selected."*
+**Numeric — min/max.** Optional inclusive Minimum and Maximum plus an optional whole-numbers rule. A minimum of 4 means 4 passes. `0` is a real answer, not a blank.
 
-**Numeric - min/max.** Optional inclusive **Minimum** and **Maximum**, plus an optional whole-numbers-only rule. A minimum of 4 means 4 passes. Example: "How many meetings did you have this week?" with min 4 stays *partial* until the learner enters 4 or more. `0` is treated as a real answer, not a blank.
+**URL.** Must be a valid `http://` or `https://` link; anything else is *partial*. Validation is structural only (no network calls).
 
-**URL.** Must be a valid `http://` or `https://` link. Anything else is *partial* and blocks completion. Validation is structural only (no network calls, since the SCO runs offline). Valid links render as a clickable preview (`target="_blank"`, `rel="noopener noreferrer"`).
+**Rating.** The value must be one of the points in its scale. A value orphaned by a later scale edit becomes *partial*, not complete.
 
 ---
 
-## What the exported package does
+## Rating scales
 
-Each published workbook is a static **HTML/CSS/JavaScript** SCO (no server or Node runtime):
+The **Rating Scales** screen manages a global library. Four ship built in:
 
-- Launches in an LMS iframe as a single learning object.
-- Talks to the LMS via the SCORM 2004 4th Edition runtime API (`API_1484_11`), discovered by walking the parent/opener frames, with a standalone no-LMS fallback for local preview.
-- Presents questions grouped into ordered sections with a live, color-coded status dashboard (green completed, orange partially complete, amber in progress, gray not started).
-- Auto-saves after every page and every response change (`SetValue` + `Commit`), plus a `beforeunload` save.
-- On exit sets `cmi.exit = "suspend"`; on relaunch (`cmi.entry = "resume"`) it rehydrates all responses and the section/page cursor from `cmi.suspend_data`, then shows the section list.
-- Reports `cmi.completion_status`, `cmi.progress_measure`, `cmi.session_time`/`cmi.total_time`, and optionally `cmi.success_status`.
-- Is keyboard operable with visible focus (WCAG 2.1 AA oriented) and works offline after deployment.
-- Ships `imsmanifest.xml` and `index.html` at the ZIP root.
+| id | Points |
+|---|---|
+| `numeric-5` | 1, 2, 3, 4, 5 |
+| `agreement-5` | Strongly Agree, Agree, Neutral, Disagree, Strongly Disagree |
+| `frequency-5` | Always, Almost Always, Sometimes, Rarely, Never |
+| `confidence-3` | Low, Medium, High |
+
+Built-ins cannot be deleted but can be duplicated. A question references one by `scaleId`, or carries a one-off inline scale.
+
+### Value vs label
+
+Each point has a **value** (stored in `cmi.suspend_data`, shown to facilitators) and a **label** (what the learner reads). Responses persist the **value only**, so rewording "Neutral" later does not invalidate data already in the LMS. Changing a *value* is the unsafe edit, and the editor says so inline.
+
+### Three things worth knowing
+
+1. **Scales are inlined at publish, not looked up at runtime.** The SCO is offline and cannot call back to the server, so `inlineScales()` bakes concrete points into the package. **Editing a scale does not change an already-published package** — republish to pick up new wording.
+2. **A dangling `scaleId` blocks export** rather than silently publishing an empty scale. The Rating Scales screen checks usage before deleting and lists affected questions.
+3. **Rendering adapts to the labels.** Short labels (numbers) render as a row of chips; longer labels render one row per point with a value badge, which reads correctly on a phone and in a screen reader. Screen readers hear "2, Agree", collapsing to just "1" on unlabeled scales. Short numeric scales support optional end captions ("Not at all" … "Expert").
+
+### Backward compatibility
+
+Legacy inline arrays keep working, and this is subtler than it looks:
+
+```js
+scale: [1, 2, 3, 4, 5]          -> values 1..5        (responses were "1".."5")
+scale: ['Low','Medium','High']  -> values 'Low'...    (responses were "Low"...)
+```
+
+The old runtime stored `String(point)`, so for a string array the **label was the stored value**. Renumbering Low/Medium/High to 1..3 would silently orphan every response already in an LMS. Both forms are preserved exactly, with tests pinning it.
+
+---
+
+## Learner PDF download
+
+When enabled, the runtime header shows a **PDF** button on the section list. Wherever the learner is, the PDF contains the **entire workbook**: every section with its status, every question and answer, overall progress, and their name from `cmi.learner_name`.
+
+- **Unanswered** questions appear as "Not answered" rather than being omitted.
+- **Partial** answers carry the same neutral requirement hint the runtime shows.
+- **Ratings** read as `Agree (2)`, collapsing to `3` when the scale is unlabeled.
+- **Privacy:** the PDF never reveals which checklist options were flagged Expected. Only the learner's own selections are listed, and the word "expected" never appears.
+
+Turn it off per workbook on **Workbook Settings** or with `Allow PDF Download` in the Excel Settings sheet. Defaults to **on**.
+
+### How it is built
+
+Generated **entirely inside the SCO** with no server call, so it works offline. Rather than bundling jsPDF (~350 KB and a break in the "no third-party code" rule), `runtime-template/js/pdf.js` is a purpose-built ~12 KB PDF writer: base-14 Helvetica (no font embedding), real Adobe glyph-width tables for wrapping, automatic pagination, a byte-accurate `xref` table, and WinAnsi substitution for the characters learners paste from Word (smart quotes, em dashes, ellipses, bullets).
+
+### LMS sandbox caveat
+
+Some LMS players host the SCO in an iframe whose `sandbox` lacks `allow-downloads`. The browser then blocks the download **silently**, with no error to catch. The runtime therefore always renders a visible fallback link:
+
+> Download did not start? **Open the PDF in a new tab.**
+
+**Verify this in your Workday Learning sandbox before wide release**, since behavior varies by LMS and browser.
+
+---
+
+## Navigation behavior
+
+- **Resume always returns to the section list**, so the learner chooses what to continue.
+- A section left mid-way reopens at the **exact question** they left off on ("Continue").
+- A **Completed** section reopens at **question 1** for review, matching its "Review" button.
+- Section cards and PDF headings show the **author's title verbatim** — no "Section N:" prefix, so "Month 1" reads naturally.
 
 ---
 
 ## Monorepo layout
 
 ```
-scorm-observation-workbook-builder/
-├─ package.json                 # npm workspaces root
+scorm-om/
 ├─ packages/
-│  ├─ shared/                   # constants, ids, JSDoc types (framework-free)
-│  ├─ workbook-engine/          # response/section states, validation, suspend serialization (pure, browser-safe)
-│  ├─ scorm-runtime/            # assembleRuntime(): the runtime file set for preview AND export
+│  ├─ shared/                   # constants, ids, JSDoc types, rating scale library
+│  ├─ workbook-engine/          # response/section states, validation, suspend serialization
+│  ├─ scorm-runtime/            # assembleRuntime(): the file set for preview AND export
 │  ├─ export-service/           # export-target registry, manifest.js, packager.js (jszip)
 │  ├─ mock-lms/                 # headless SCORM 2004 API_1484_11 for tests + preview
 │  └─ excel-io/                 # xlsx read/write on jszip + workbook<->xlsx mapping
 ├─ apps/
-│  ├─ server/                   # node:http authoring server (thin glue)
+│  ├─ server/                   # node:http authoring server + workbook/scale stores
 │  └─ web/                      # zero-build vanilla ES-module authoring UI
 ├─ runtime-template/            # SOURCE of the exported/preview runtime
-│  ├─ index.html                # SCO entry (templated)
 │  ├─ js/adapter.js             # API_1484_11 discovery + fallback
-│  ├─ js/session.js             # DOM-free SCORM/state core (shared by player + tests)
-│  ├─ js/player.js              # learner UI (dashboard, pages, question types)
-│  ├─ js/engine/*.js            # Node-only shims; the assembler swaps in the real engine
-│  └─ css/player.css
-├─ scripts/                     # build-template-xlsx.js, export-demo.js
-├─ samples/                     # demo workbook JSON + template.xlsx
-└─ tests/                       # node:test suites + Playwright e2e
+│  ├─ js/session.js             # DOM-free SCORM/state core
+│  ├─ js/player.js              # learner UI
+│  ├─ js/rating.js              # rating scale rendering
+│  ├─ js/pdf.js                 # dependency-free PDF writer
+│  ├─ js/report.js              # workbook -> PDF report builder
+│  └─ js/engine/*.js            # Node-only shims; the assembler swaps in the real modules
+├─ scripts/ samples/ data/ tests/
 ```
 
 ### One runtime, two consumers
 
-`packages/scorm-runtime/assemble.js` produces the flat set of runtime files. The authoring **Preview** serves this set live, and **export** writes the identical set into the ZIP, so preview and the shipped package run byte-identical player code. The completion/suspend engine is pure and dependency-free, so it is copied verbatim into the package (no bundler).
-
----
-
-## Data model
-
-```json
-{
-  "id": "ascend-ae-install-ride-along",
-  "title": "AE Install Ride-Along Observation Workbook",
-  "version": "1.1",
-  "settings": {
-    "language": "en-US",
-    "navigation": "free",
-    "completionRule": "all-required-sections",
-    "reportSuccess": false,
-    "dashboardHeading": "Your observation workbook"
-  },
-  "sections": [
-    { "id": "s1", "title": "Install Team Meeting", "required": true,
-      "questions": [
-        { "id": "q1", "type": "checklist", "prompt": "Which topics were covered?", "required": true,
-          "options": [
-            { "id": "o1", "label": "Scope review", "expected": true },
-            { "id": "o2", "label": "Schedule" }
-          ] },
-        { "id": "q2", "type": "numeric", "prompt": "How many jobs did you review?",
-          "required": true, "min": 4, "integerOnly": true },
-        { "id": "q3", "type": "url", "prompt": "Link to your notes", "required": false }
-      ] }
-  ]
-}
-```
-
-Learner state (persisted compactly to `cmi.suspend_data`, cursor mirrored to `cmi.location` as `sectionId:page`):
-
-```json
-{ "currentSection": "s2", "currentPage": 3,
-  "responses": { "q1": ["o1"], "q2": "6", "q3": "https://..." },
-  "sectionStatus": { "s1": "completed", "s2": "partially_complete", "s3": "not_started" } }
-```
-
-Suspend data stores **ids and response values only** - never prompt or section text - to respect the SCORM 2004 capacity (>= 64000 chars). The Publish screen estimates worst-case usage and warns before the limit.
-
-### Question types
-
-`short_text`, `long_text`, `yes_no`, `numeric`, `url`, `rating` (1-5 or Low/Medium/High), `checklist`, `single_select`, `multiple_select`, `datetime`, `acknowledgement`, and `evidence_ref` (records file **metadata only**; never stores a binary in SCORM).
+`packages/scorm-runtime/assemble.js` produces the flat runtime file set. **Preview** serves it live and **export** writes the identical set into the ZIP, so both run byte-identical code. The engine and scale modules are dependency-free and copied verbatim into the package, so the browser resolves them with no bundler.
 
 ---
 
 ## Excel import
 
-Download **`template.xlsx`** from the Library screen (or `npm run build:template`). Sheets: Instructions, Settings, Sections, Questions.
+Download `template.xlsx` from the Library screen. Sheets: Instructions, Settings, Sections, Questions.
 
-- **Settings** supports a `Dashboard Heading` key for the learner-facing section-list heading.
+- **Settings** supports `Dashboard Heading` and `Allow PDF Download`.
 - **Questions** columns: `Section ID`, `Type`, `Prompt`, `Required`, `Options`, `Rating Scale`, `Min`, `Max`, `Whole Numbers`, `Help Text`.
-- Mark an **expected** option by prefixing it with `*`, for example `Scope review | *Safety plan | Schedule`. The asterisk is stripped from the visible label.
+- Mark an expected option with `*`: `Scope review | *Safety plan | Schedule`.
+- `Rating Scale` accepts a scale id (`agreement-5`), a scale name (`Agreement (5-point)`), explicit points (`1=Strongly Agree | 2=Agree`), bare labels (`Low|Medium|High`), or `1-5`.
 
-Columns are matched **by header name**, not position, so templates authored against an earlier column set still import cleanly (a regression test covers this).
-
----
-
-## Uploading to Workday Learning
-
-1. Publish -> **Build SCORM ZIP**.
-2. In Workday Learning, create a lesson and upload the ZIP as **SCORM 2004** content.
-3. Configure the lesson to track completion. The SCO reports completion + progress automatically.
-4. **Recommended:** run the package through the **ADL SCORM 2004 4th Edition Test Suite** before wide release.
+Columns are matched **by header name**, not position, so older templates still import cleanly.
 
 ---
 
 ## Tests
 
 ```bash
-npm test    # 51 tests
+npm test    # 122 tests
 ```
 
-Coverage highlights:
+| Suite | Covers |
+|---|---|
+| `engine.test.js` (25) | three-state model, expected gating, numeric bounds, url, rating-vs-scale, section rollup, question-level progress, linear nav |
+| `scales.test.js` (22) | built-in definitions, library merge/override, legacy normalization (both traps), resolution, inlining, PDF formatting, validation, the Excel column, **browser-copy parity** |
+| `player-dom.test.js` (20) | real `player.js` against a fake DOM: titles without prefix, configurable heading, partial hints, rating layouts, resume-to-dashboard, review rewind, learner name, PDF button |
+| `pdf.test.js` (25) | byte-accurate xref, `/Length`, escaping, Word-character substitution, Helvetica metrics, wrapping, pagination, report content, **privacy guarantee** |
+| `mock-lms-suspend-resume.test.js` (13) | real `SessionCore` against `MockLMS`: suspend/resume, partial persistence, read-only `cmi.learner_name` |
+| `export.test.js` (17) | package structure, **every relative import resolving inside the ZIP**, no workspace imports, manifest completeness, scale inlining, Excel round-trip |
 
-- **`tests/engine.test.js`** - the three-state response model, expected-option gating (including that hints never leak expected labels), numeric inclusive bounds / whole numbers / zero handling, url validation, section rollup to Partially Complete, question-level progress, linear-nav gating, and validation rules.
-- **`tests/mock-lms-suspend-resume.test.js`** - drives the real `SessionCore` against `MockLMS`: partial responses survive suspend/resume and still block completion; progress advances per question.
-- **`tests/player-dom.test.js`** - renders the real `player.js` against a fake DOM: configurable heading (set, unset, blank), partial hints for checklist/numeric/url, url preview attributes, expected options not visually marked, resume lands on the dashboard, and every question type renders.
-- **`tests/export.test.js`** - package structure, manifest, xlsx round-trip of `*` markers and numeric bounds, legacy-template compatibility, and an explicit assertion that the facilitator CSV feature is fully removed.
+Verified separately during the build: the authoring server serves every asset and endpoint; the Preview route serves all 12 runtime files; and **the shipped package generates a valid multi-page PDF using only the files inside the ZIP, with no `node_modules` present.**
 
-### End-to-end tests (Playwright)
-
-`tests/e2e/learner.spec.js` drives the runtime in a real browser through the mock-LMS harness, covering the expected-checklist and numeric-bound gating, exit + resume, url validation, and the custom heading. Playwright is not bundled:
+### End-to-end (Playwright)
 
 ```bash
 npm i -D @playwright/test
@@ -216,19 +212,23 @@ npx playwright install chromium
 npm run test:e2e
 ```
 
+Covers section titles, expected/numeric gating, review rewind, labeled rating rendering, exit + resume, and a real browser `download` event.
+
 ---
+
+## Uploading to Workday Learning
+
+1. Publish → **Build SCORM ZIP**.
+2. In Workday Learning, create a lesson and upload the ZIP as **SCORM 2004** content.
+3. Configure the lesson to track completion.
+4. **Recommended:** run the package through the ADL SCORM 2004 4th Edition Test Suite, and confirm the PDF download (and its fallback link) behaves in your sandbox.
 
 ## Tech stack
 
-- **Authoring runtime:** Node.js >= 20, built-in `node:http` (no framework).
-- **Authoring UI:** zero-build vanilla ES modules + CSS.
-- **Workbook runtime:** vanilla JS ES modules; the same `player.js` for preview and export.
-- **SCORM:** custom `API_1484_11` adapter; custom SCORM 2004 4th Edition `manifest.js`.
-- **Packaging / xlsx:** `jszip`. **Ids:** `nanoid`. No other runtime dependencies; the exported package bundles no third-party code.
-- **Types:** JSDoc + `// @ts-check`, `tsc --noEmit`.
+Node.js >= 20 with built-in `node:http`; zero-build vanilla ES modules for both the authoring UI and the runtime; custom `API_1484_11` adapter and SCORM 2004 manifest generator; `jszip` for packaging and xlsx, `nanoid` for ids. **The exported package bundles no third-party code.** Types via JSDoc + `// @ts-check`.
 
-**Production target (designed for, not built):** Express/Fastify backend, React + TypeScript UI, Prisma + SQLite/PostgreSQL. Business logic sits behind clear package seams so it can move without touching workbook-state, SCORM, validation, packaging, or import code.
+**Production target (designed for, not built):** Express/Fastify, React + TypeScript, Prisma + SQLite/PostgreSQL. Business logic sits behind package seams so it can move without touching workbook-state, SCORM, validation, packaging, or import code.
 
 ## cmi5 forward compatibility
 
-The authored workbook JSON keeps prompts/options out of suspend data and treats evidence as metadata only, so the same content can later publish to cmi5 without re-authoring. `export-service` uses an export-target abstraction; `packages/export-service/targets/cmi5.js` documents the planned target. It is intentionally not registered in the MVP.
+The authored JSON keeps prompts out of suspend data and treats evidence as metadata only, so the same content can later publish to cmi5 without re-authoring. `packages/export-service/targets/cmi5.js` documents the planned target; it is intentionally not registered in the MVP.

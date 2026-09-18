@@ -1,12 +1,13 @@
 {
   "name": "@sowb/workbook-engine",
-  "version": "1.1.0",
+  "version": "1.4.0",
   "type": "module",
   "main": "index.js",
   "exports": {
     ".": "./index.js",
     "./completion.js": "./completion.js",
     "./validation.js": "./validation.js",
-    "./suspend.js": "./suspend.js"
+    "./suspend.js": "./suspend.js",
+    "./scales.js": "./scales.js"
   }
 }

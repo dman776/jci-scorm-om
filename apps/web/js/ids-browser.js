@@ -1,5 +1,5 @@
 // @ts-check
-/** Browser-side id generation (no bundler, so we do not import the node nanoid). */
+/** Browser-side id generation (no bundler, so we cannot import the node nanoid). */
 const alphabet = '0123456789abcdefghijkmnpqrstuvwxyz';
 function rand(size = 8) {
   let out = '';

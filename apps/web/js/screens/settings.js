@@ -31,7 +31,7 @@ export function renderSettings(mount, { store }) {
         textField('Author', () => wb.author, (v) => (wb.author = v)),
         textField('Course ID', () => wb.courseId, (v) => (wb.courseId = v), { hint: 'Used for the SCORM identifier and file names. Letters, numbers, dashes.' }),
         textField('Language', () => wb.settings.language, (v) => (wb.settings.language = v)),
-        textField('Estimated Duration', () => wb.estimatedDuration, (v) => (wb.estimatedDuration = v), { hint: 'e.g. "2-3 weeks"' }),
+        textField('Estimated Duration', () => wb.estimatedDuration, (v) => (wb.estimatedDuration = v), { hint: 'e.g. "3 months"' }),
       ]),
       textField('Description', () => wb.description, (v) => (wb.description = v), { textarea: true }),
     ]),
@@ -49,7 +49,7 @@ export function renderSettings(mount, { store }) {
         }),
         h('span', 'Allow learners to download a PDF of their responses'),
       ]),
-      h('p.field-hint', 'Adds a button on each section that exports the learner\u2019s answers for the ENTIRE workbook as a PDF. The PDF never reveals which checklist options were marked Expected.'),
+      h('p.field-hint', 'Adds a button in the runtime header that exports the learner\u2019s answers for the ENTIRE workbook as a PDF. The PDF never reveals which checklist options were marked Expected.'),
     ]),
 
     h('div.card', [

@@ -8,17 +8,26 @@
  *
  * Expected options: prefix an option label with `*` to mark it expected, e.g.
  *   Scope review | *Safety plan | Schedule
- * For checklist and multiple_select the learner must select every expected
- * option for the question to count as complete.
+ *
+ * Rating Scale accepts, in precedence order:
+ *   agreement-5                    a scale id from the library
+ *   Agreement (5-point)            a scale NAME from the library (case-insensitive)
+ *   1=Strongly Agree | 2=Agree     explicit value=label pairs (one-off scale)
+ *   Low|Medium|High                bare labels; the label doubles as the value,
+ *                                  matching legacy behaviour so older templates
+ *                                  keep importing unchanged
+ *   1-5 or blank                   the built-in numeric-5
  */
 import { writeXlsx, readXlsx } from './index.js';
 import { newOptionId } from '@sowb/shared/ids.js';
+import { buildScaleIndex, listScales, CUSTOM_SCALE_ID } from '@sowb/shared/scales.js';
 
 /**
  * Parse an uploaded xlsx buffer into a workbook object.
  * @param {Buffer|Uint8Array} buffer
+ * @param {{customScales?: any[]}} [opts]
  */
-export async function importWorkbookXlsx(buffer) {
+export async function importWorkbookXlsx(buffer, opts = {}) {
   const sheets = await readXlsx(buffer);
   const byName = {};
   for (const s of sheets) byName[s.name.trim().toLowerCase()] = s.rows;
@@ -33,7 +42,7 @@ export async function importWorkbookXlsx(buffer) {
 
   const settings = parseSettings(settingsRows);
   const sections = parseSections(sectionRows, warnings);
-  attachQuestions(sections, questionRows, warnings);
+  attachQuestions(sections, questionRows, warnings, opts.customScales || []);
 
   const workbook = {
     id: settings.id || slug(settings.title || 'imported-workbook'),
@@ -58,6 +67,64 @@ export async function importWorkbookXlsx(buffer) {
   return { workbook, warnings };
 }
 
+/**
+ * Parse a Rating Scale cell.
+ * @param {string} raw
+ * @param {any[]} [customScales]
+ * @returns {{scaleId?:string, scale?:any[], warning?:string}}
+ */
+export function parseScaleCell(raw, customScales = []) {
+  const text = String(raw == null ? '' : raw).trim();
+  const all = listScales(customScales);
+  const index = buildScaleIndex(customScales);
+
+  // Blank and "1-5" both meant the numeric scale in the old template.
+  if (text === '') return { scaleId: 'numeric-5' };
+  if (text.toLowerCase() === '1-5') return { scaleId: 'numeric-5' };
+
+  if (index[text]) return { scaleId: text };
+
+  const byName = all.find((s) => s.name.toLowerCase() === text.toLowerCase());
+  if (byName) return { scaleId: byName.id };
+
+  if (text.includes('|')) {
+    const parts = text.split('|').map((s) => s.trim()).filter(Boolean);
+    const explicit = parts.every((p) => p.includes('='));
+    const points = parts.map((part) => {
+      if (explicit) {
+        const eq = part.indexOf('=');
+        const rawValue = part.slice(0, eq).trim();
+        const label = part.slice(eq + 1).trim();
+        return { value: isFinite(Number(rawValue)) && rawValue !== '' ? Number(rawValue) : rawValue, label };
+      }
+      // Bare labels: the label is also the value, matching what the old runtime
+      // stored so existing responses keep resolving.
+      return { value: part, label: part };
+    });
+    if (points.length < 2) {
+      return { scaleId: 'numeric-5', warning: `Rating Scale "${text}" has fewer than two points; defaulted to Numeric 1-5.` };
+    }
+    return { scaleId: CUSTOM_SCALE_ID, scale: points };
+  }
+
+  return {
+    scaleId: 'numeric-5',
+    warning: `Rating Scale "${text}" did not match a library scale id or name; defaulted to Numeric 1-5.`,
+  };
+}
+
+/** Render a question's scale back out to a template cell (lossless round-trip). */
+export function formatScaleCell(question) {
+  if (question.scaleId && question.scaleId !== CUSTOM_SCALE_ID) return question.scaleId;
+  const points = question.scale || [];
+  if (!points.length) return '';
+  return points.map((p) => {
+    const value = p && typeof p === 'object' ? p.value : p;
+    const label = p && typeof p === 'object' ? p.label : p;
+    return String(value) === String(label) ? String(label) : `${value}=${label}`;
+  }).join(' | ');
+}
+
 /** Build template.xlsx with a valid mini example workbook that round-trips. */
 export async function buildTemplateXlsx() {
   const instructions = [
@@ -79,17 +146,27 @@ export async function buildTemplateXlsx() {
     ['  Required       yes or no. Only required questions gate section completion.'],
     ['  Options        Pipe-delimited choices for single_select / multiple_select / checklist, e.g. Yes | No | N/A'],
     ['                 Prefix an option with * to mark it EXPECTED, e.g. Scope review | *Safety plan'],
-    ['  Rating Scale   For rating questions only: 1-5  OR  Low|Medium|High'],
+    ['  Rating Scale   A scale id (agreement-5), a scale name (Agreement (5-point)),'],
+    ['                 explicit points (1=Strongly Agree | 2=Agree | 3=Neutral),'],
+    ['                 bare labels (Low|Medium|High), or 1-5 for the numeric built-in.'],
     ['  Min            For numeric questions. Inclusive lower bound, e.g. 4'],
     ['  Max            For numeric questions. Inclusive upper bound, e.g. 10'],
     ['  Whole Numbers  For numeric questions. yes to reject decimals.'],
     ['  Help Text      Optional guidance shown under the prompt.'],
+    [''],
+    ['Built-in rating scales:'],
+    ['  numeric-5      1, 2, 3, 4, 5'],
+    ['  agreement-5    Strongly Agree, Agree, Neutral, Disagree, Strongly Disagree'],
+    ['  frequency-5    Always, Almost Always, Sometimes, Rarely, Never'],
+    ['  confidence-3   Low, Medium, High'],
+    ['Manage your own scales on the Rating Scales screen in the app.'],
     [''],
     ['Completion rules:'],
     ['  - A question is COMPLETE only when its response satisfies its requirement.'],
     ['  - checklist / multiple_select: the learner must select EVERY option marked with *.'],
     ['  - numeric: the value must fall within Min/Max (inclusive).'],
     ['  - url: the value must be a valid http:// or https:// link.'],
+    ['  - rating: the value must be one of the points in its scale.'],
     ['  - A question that has a response but fails its requirement is PARTIAL and does not count.'],
     ['  - A section is COMPLETED only when every REQUIRED question in it is COMPLETE.'],
     ['  - A section where nothing is blank but a requirement is unmet shows as PARTIALLY COMPLETE.'],
@@ -104,20 +181,20 @@ export async function buildTemplateXlsx() {
     ['Version', '1.0'],
     ['Author', 'JCI ASCEND Learning'],
     ['Language', 'en-US'],
-    ['Dashboard Heading', 'Your observation workbook'],
+    ['Dashboard Heading', 'Your Milestones'],
     ['Allow PDF Download', 'yes'],
     ['Navigation', 'free'],
     ['Completion Rule', 'all-required-sections'],
     ['Report Success', 'no'],
     ['Course ID', 'ascend-ae-install-ride-along'],
-    ['Estimated Duration', '2-3 weeks'],
+    ['Estimated Duration', '3 months'],
   ];
 
   const sections = [
     ['Section ID', 'Title', 'Required (yes/no)', 'Order'],
-    ['s1', 'Install Team Meeting', 'yes', '1'],
-    ['s2', 'Install Manager Shadow', 'yes', '2'],
-    ['s3', 'Install Technician Ride Along', 'yes', '3'],
+    ['s1', 'Month 1', 'yes', '1'],
+    ['s2', 'Month 2', 'yes', '2'],
+    ['s3', 'Month 3', 'yes', '3'],
   ];
 
   const questions = [
@@ -126,9 +203,9 @@ export async function buildTemplateXlsx() {
     ['s1', 'long_text', 'What was discussed in the meeting?', 'yes', '', '', '', '', '', 'Summarize scope, safety, and roles.'],
     ['s1', 'checklist', 'Which topics were covered?', 'yes', '*Scope review | *Safety plan | Schedule | Customer expectations', '', '', '', '', 'Check all that apply.'],
     ['s2', 'short_text', 'Manager you shadowed', 'yes', '', '', '', '', '', ''],
-    ['s2', 'numeric', 'How many install jobs did you review this week?', 'yes', '', '', '4', '', 'yes', 'Review at least four jobs.'],
-    ['s2', 'rating', 'How confident do you feel about the install handoff process?', 'yes', '', 'Low|Medium|High', '', '', '', ''],
-    ['s2', 'long_text', 'Describe one thing you learned from the manager', 'yes', '', '', '', '', '', ''],
+    ['s2', 'numeric', 'How many install jobs did you review this month?', 'yes', '', '', '4', '', 'yes', 'Review at least four jobs.'],
+    ['s2', 'rating', 'The install handoff process was clearly explained.', 'yes', '', 'agreement-5', '', '', '', ''],
+    ['s2', 'rating', 'How often did the team run a safety briefing?', 'yes', '', 'frequency-5', '', '', '', ''],
     ['s3', 'yes_no', 'Did you complete a full ride-along day?', 'yes', '', '', '', '', '', ''],
     ['s3', 'rating', 'Rate your understanding of on-site install steps', 'yes', '', '1-5', '', '', '', '1 = low, 5 = high'],
     ['s3', 'url', 'Link to your ride-along notes or photos', 'no', '', '', '', '', '', 'Paste a SharePoint or Teams link starting with https://'],
@@ -190,7 +267,7 @@ function parseSections(rows, warnings) {
   return out;
 }
 
-function attachQuestions(sections, rows, warnings) {
+function attachQuestions(sections, rows, warnings, customScales) {
   const byId = {};
   for (const s of sections) byId[s.id] = s;
   const header = (rows[0] || []).map(norm);
@@ -219,6 +296,7 @@ function attachQuestions(sections, rows, warnings) {
     const help = cell(row, idx.help);
     if (help) q.helpText = help;
 
+    // Options, with a leading * marking an expected option.
     const optionsRaw = cell(row, idx.options);
     if (optionsRaw) {
       q.options = optionsRaw.split('|').map((s) => s.trim()).filter(Boolean).map((label) => {
@@ -230,16 +308,15 @@ function attachQuestions(sections, rows, warnings) {
       });
     }
 
-    const scaleRaw = cell(row, idx.scale);
     if (type === 'rating') {
-      q.scale = scaleRaw && scaleRaw.toLowerCase() !== '1-5'
-        ? scaleRaw.split('|').map((s) => s.trim()).filter(Boolean)
-        : [1, 2, 3, 4, 5];
+      const parsed = parseScaleCell(cell(row, idx.scale), customScales);
+      if (parsed.warning) warnings.push(`Questions row ${r + 1}: ${parsed.warning}`);
+      if (parsed.scaleId) q.scaleId = parsed.scaleId;
+      if (parsed.scale) q.scale = parsed.scale;
     }
 
     if (type === 'numeric') {
-      const min = cell(row, idx.min);
-      const max = cell(row, idx.max);
+      const min = cell(row, idx.min), max = cell(row, idx.max);
       if (min !== '') {
         if (isFinite(Number(min))) q.min = Number(min);
         else warnings.push(`Questions row ${r + 1}: Min "${min}" is not a number and was ignored.`);
@@ -254,6 +331,8 @@ function attachQuestions(sections, rows, warnings) {
     section.questions.push(q);
   }
 }
+
+// ---- misc ----------------------------------------------------------------
 
 function cell(row, i) { if (i === undefined || i < 0) return ''; return String(row[i] ?? '').trim(); }
 function colFinder(header, spec) {

@@ -9,10 +9,9 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { slugify } from '@sowb/shared/ids.js';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = join(__dirname, '..', '..', 'data', 'workbooks');
-
-async function ensureDir() { await mkdir(DATA_DIR, { recursive: true }); }
+const DATA_DIR = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'data', 'workbooks');
+const ensureDir = () => mkdir(DATA_DIR, { recursive: true });
+const safeName = (id) => String(id).replace(/[^a-z0-9._-]/gi, '-') + (String(id).endsWith('.json') ? '' : '.json');
 
 export async function listWorkbooks() {
   await ensureDir();
@@ -27,10 +26,20 @@ export async function listWorkbooks() {
   return out.sort((a, b) => String(a.title).localeCompare(String(b.title)));
 }
 
+/** Full workbook objects, used for scale-usage lookups. */
+export async function readAllWorkbooks() {
+  await ensureDir();
+  const files = (await readdir(DATA_DIR)).filter((f) => f.endsWith('.json'));
+  const out = [];
+  for (const f of files) {
+    try { out.push(JSON.parse(await readFile(join(DATA_DIR, f), 'utf8'))); } catch (_) { /* skip */ }
+  }
+  return out;
+}
+
 export async function getWorkbook(id) {
   await ensureDir();
-  try { return JSON.parse(await readFile(join(DATA_DIR, safeName(id)), 'utf8')); }
-  catch (_) { return null; }
+  try { return JSON.parse(await readFile(join(DATA_DIR, safeName(id)), 'utf8')); } catch (_) { return null; }
 }
 
 export async function saveWorkbook(workbook) {
@@ -42,10 +51,5 @@ export async function saveWorkbook(workbook) {
 
 export async function deleteWorkbook(id) {
   await ensureDir();
-  try { await unlink(join(DATA_DIR, safeName(id))); return true; }
-  catch (_) { return false; }
-}
-
-function safeName(id) {
-  return String(id).replace(/[^a-z0-9._-]/gi, '-') + (String(id).endsWith('.json') ? '' : '.json');
+  try { await unlink(join(DATA_DIR, safeName(id))); return true; } catch (_) { return false; }
 }

@@ -12,13 +12,8 @@ export async function renderPublish(mount, { store, api }) {
   const body = inner.querySelector('#publish-body');
 
   let report;
-  try {
-    report = await api.validate(wb);
-  } catch (err) {
-    body.innerHTML = '';
-    body.appendChild(h('div.card.error', 'Validation request failed: ' + err.message));
-    return;
-  }
+  try { report = await api.validate(wb); }
+  catch (err) { body.innerHTML = ''; body.appendChild(h('div.card.error', 'Validation request failed: ' + err.message)); return; }
   body.innerHTML = '';
 
   body.appendChild(h('div.card', [
@@ -42,10 +37,12 @@ export async function renderPublish(mount, { store, api }) {
       row('Completion rule', 'All required sections complete'),
       row('Navigation', wb.settings.navigation),
       row('Dashboard heading', wb.settings.dashboardHeading || 'Your observation workbook'),
+      row('Learner PDF download', wb.settings.allowPdfDownload !== false ? 'Enabled' : 'Disabled'),
       row('Report success status', wb.settings.reportSuccess ? 'Yes' : 'No (completion only)'),
       row('Course ID', wb.courseId || wb.id || '(auto)'),
       row('Sections', String(wb.sections.length)),
     ]),
+    h('p.field-hint', 'Rating scales are resolved and baked into the package at publish time, so the offline SCO never needs the library. Editing a scale later does not change an already-published package.'),
   ]));
 
   const buildCard = h('div.card', [
@@ -66,10 +63,7 @@ export async function renderPublish(mount, { store, api }) {
       rr.innerHTML = '';
       rr.appendChild(h('div.status-ok', `\u2713 Built ${filename} (${blob.size} bytes).`));
       toast('SCORM package built', 'success');
-    } catch (err) {
-      toast('Build failed: ' + err.message, 'error');
-    }
+    } catch (err) { toast('Build failed: ' + err.message, 'error'); }
   }
 }
-
 function row(k, v) { return h('tr', [h('td.k', k), h('td.v', v)]); }

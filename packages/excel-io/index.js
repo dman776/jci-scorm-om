@@ -5,7 +5,7 @@
  * We deliberately avoid a heavyweight xlsx dependency (the project permits only
  * jszip + nanoid). The writer emits OOXML with inline strings; the reader
  * resolves shared strings AND inline strings so it can read files produced by
- * Excel too, and it honours cell references so blank middle cells do not shift
+ * Excel, and it honours cell references so blank middle cells never shift
  * columns.
  *
  * A "sheet" is { name: string, rows: (string|number)[][] } where rows[0] is the
@@ -36,13 +36,10 @@ export async function readXlsx(buffer) {
   const zip = await JSZip.loadAsync(buffer);
   const sharedStrings = await parseSharedStrings(zip);
   const wbXml = await readFileText(zip, 'xl/workbook.xml');
-  const relsXml = await readFileText(zip, 'xl/_rels/workbook.xml.rels');
-  const relMap = parseRels(relsXml);
-  const sheetDefs = parseSheetDefs(wbXml);
+  const relMap = parseRels(await readFileText(zip, 'xl/_rels/workbook.xml.rels'));
 
-  /** @type {{name:string, rows:string[][]}[]} */
   const sheets = [];
-  for (const def of sheetDefs) {
+  for (const def of parseSheetDefs(wbXml)) {
     const target = relMap[def.rId];
     if (!target) continue;
     const path = target.startsWith('xl/') ? target : 'xl/' + target.replace(/^\/?/, '');
@@ -93,8 +90,7 @@ function rootRels() {
 }
 
 function workbookXml(sheets) {
-  const sheetTags = sheets.map((s, i) =>
-    `<sheet name="${xmlEscape(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('');
+  const sheetTags = sheets.map((s, i) => `<sheet name="${xmlEscape(s.name)}" sheetId="${i + 1}" r:id="rId${i + 1}"/>`).join('');
   return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"
  xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
@@ -128,14 +124,12 @@ function stylesXml() {
 
 async function readFileText(zip, path) {
   const f = zip.file(path);
-  if (!f) return null;
-  return f.async('string');
+  return f ? f.async('string') : null;
 }
 
 async function parseSharedStrings(zip) {
   const xml = await readFileText(zip, 'xl/sharedStrings.xml');
   if (!xml) return [];
-  /** @type {string[]} */
   const out = [];
   const siRegex = /<si\b[^>]*>([\s\S]*?)<\/si>/g;
   let m;
@@ -150,45 +144,42 @@ async function parseSharedStrings(zip) {
 }
 
 function parseRels(xml) {
-  /** @type {Record<string,string>} */
   const map = {};
   if (!xml) return map;
-  const re = /<Relationship\b[^>]*Id="([^"]+)"[^>]*Target="([^"]+)"[^>]*\/?>/g;
   let m;
+  const re = /<Relationship\b[^>]*Id="([^"]+)"[^>]*Target="([^"]+)"[^>]*\/?>/g;
   while ((m = re.exec(xml))) map[m[1]] = m[2];
+  // Handle attribute order variations (Target before Id).
   const re2 = /<Relationship\b[^>]*Target="([^"]+)"[^>]*Id="([^"]+)"[^>]*\/?>/g;
   while ((m = re2.exec(xml))) { if (!map[m[2]]) map[m[2]] = m[1]; }
   return map;
 }
 
 function parseSheetDefs(xml) {
-  /** @type {{name:string, rId:string}[]} */
   const defs = [];
   if (!xml) return defs;
-  const re = /<sheet\b[^>]*\/?>/g;
   let m;
+  const re = /<sheet\b[^>]*\/?>/g;
   while ((m = re.exec(xml))) {
     const tag = m[0];
-    const name = (/name="([^"]*)"/.exec(tag) || [])[1] || '';
-    const rId = (/r:id="([^"]*)"/.exec(tag) || [])[1] || '';
-    defs.push({ name: xmlUnescape(name), rId });
+    defs.push({
+      name: xmlUnescape((/name="([^"]*)"/.exec(tag) || [])[1] || ''),
+      rId: (/r:id="([^"]*)"/.exec(tag) || [])[1] || '',
+    });
   }
   return defs;
 }
 
 function parseSheet(xml, sharedStrings) {
-  /** @type {string[][]} */
   const rows = [];
   const rowRe = /<row\b[^>]*>([\s\S]*?)<\/row>/g;
   let rm;
   while ((rm = rowRe.exec(xml))) {
-    /** @type {string[]} */
     const cells = [];
     const cellRe = /<c\b([^>]*)(?:\/>|>([\s\S]*?)<\/c>)/g;
     let cm;
     while ((cm = cellRe.exec(rm[1]))) {
-      const attrs = cm[1] || '';
-      const body = cm[2] || '';
+      const attrs = cm[1] || '', body = cm[2] || '';
       const ref = (/r="([A-Z]+)\d+"/.exec(attrs) || [])[1];
       const type = (/t="([^"]+)"/.exec(attrs) || [])[1];
       const colIdx = ref ? colIndex(ref) : cells.length;
@@ -198,7 +189,7 @@ function parseSheet(xml, sharedStrings) {
         value = sharedStrings[parseInt(vi || '0', 10)] || '';
       } else if (type === 'inlineStr') {
         const tRegex = /<t\b[^>]*>([\s\S]*?)<\/t>/g;
-        let tm; let acc = '';
+        let tm, acc = '';
         while ((tm = tRegex.exec(body))) acc += xmlUnescape(tm[1]);
         value = acc;
       } else {
@@ -217,11 +208,7 @@ function parseSheet(xml, sharedStrings) {
 function colLetter(n) {
   let s = '';
   n += 1;
-  while (n > 0) {
-    const rem = (n - 1) % 26;
-    s = String.fromCharCode(65 + rem) + s;
-    n = Math.floor((n - 1) / 26);
-  }
+  while (n > 0) { const rem = (n - 1) % 26; s = String.fromCharCode(65 + rem) + s; n = Math.floor((n - 1) / 26); }
   return s;
 }
 function colIndex(letters) {

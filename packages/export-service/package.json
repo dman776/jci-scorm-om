@@ -1,12 +1,8 @@
 {
   "name": "@sowb/export-service",
-  "version": "1.1.0",
+  "version": "1.4.0",
   "type": "module",
   "main": "index.js",
-  "exports": {
-    ".": "./index.js",
-    "./manifest.js": "./manifest.js",
-    "./packager.js": "./packager.js"
-  },
+  "exports": { ".": "./index.js", "./manifest.js": "./manifest.js", "./packager.js": "./packager.js" },
   "dependencies": { "jszip": "3.10.1" }
 }

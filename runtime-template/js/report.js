@@ -12,9 +12,9 @@ import { PdfDoc, FONT } from './pdf.js';
 import {
   getResponseState, getRequirementHint,
   computeAllSectionStatus, computeProgressMeasure, isWorkbookComplete,
-  PARTIAL,
-  COMPLETED, IN_PROGRESS, PARTIALLY_COMPLETE, NOT_STARTED,
+  PARTIAL, COMPLETED, IN_PROGRESS, PARTIALLY_COMPLETE, NOT_STARTED,
 } from './engine/completion.js';
+import { resolveScalePoints, formatScaleAnswer } from './engine/scales.js';
 
 const STATUS_LABEL = {
   [COMPLETED]: 'Completed',
@@ -24,8 +24,8 @@ const STATUS_LABEL = {
 };
 
 /**
- * @param {import('@sowb/shared').Workbook} workbook
- * @param {import('@sowb/shared').LearnerState} state
+ * @param {any} workbook
+ * @param {any} state
  * @param {{ learnerName?: string, generatedOn?: Date }} [opts]
  *   learnerName comes from cmi.learner_name via SessionCore.learnerName().
  * @returns {Uint8Array}
@@ -39,8 +39,8 @@ export function buildResponseReport(workbook, state, opts = {}) {
   const learnerName = String(opts.learnerName || '').trim();
 
   const doc = new PdfDoc({
-    // Personalize the document title too, so the browser tab and any print
-    // dialog identify whose responses these are.
+    // Personalize the document title so the browser tab and any print dialog
+    // identify whose responses these are.
     title: learnerName
       ? `${workbook.title} - ${learnerName} - My Responses`
       : `${workbook.title} - My Responses`,
@@ -49,8 +49,6 @@ export function buildResponseReport(workbook, state, opts = {}) {
 
   // ---- heading block ----
   doc.paragraph(workbook.title, { font: FONT.BOLD, size: 18, spaceAfter: 2 });
-  // The learner's name is the most prominent line after the title when the
-  // LMS supplies it; otherwise fall back to the generic subtitle.
   if (learnerName) {
     doc.paragraph(learnerName, { font: FONT.BOLD, size: 13, spaceAfter: 1 });
     doc.paragraph('My responses', { font: FONT.BOLD, size: 10.5, gray: 0.4, spaceAfter: 8 });
@@ -58,7 +56,6 @@ export function buildResponseReport(workbook, state, opts = {}) {
   } else {
     doc.paragraph('My responses', { font: FONT.BOLD, size: 11, gray: 0.35, spaceAfter: 8 });
   }
-
   doc.labelled('Generated: ', formatDateTime(generatedOn));
   doc.labelled('Overall progress: ', `${progress}% complete`);
   doc.labelled('Workbook status: ', complete ? 'Completed' : 'Incomplete');
@@ -70,9 +67,11 @@ export function buildResponseReport(workbook, state, opts = {}) {
   }
 
   // ---- sections ----
-  (workbook.sections || []).forEach((section, si) => {
+  (workbook.sections || []).forEach((section) => {
     const status = sectionStatus[section.id] || NOT_STARTED;
-    doc.heading(`Section ${si + 1}: ${section.title}`, { size: 13 });
+    // Use the author's section title verbatim. No "Section N:" prefix, so
+    // titles like "Month 1" read naturally and the PDF matches the dashboard.
+    doc.heading(section.title, { size: 13 });
     doc.paragraph(
       `${section.required ? 'Required' : 'Optional'}   |   Status: ${STATUS_LABEL[status]}`,
       { size: 9.5, gray: 0.35, spaceAfter: 6 }
@@ -132,6 +131,10 @@ export function formatAnswer(q, value) {
       const opt = (q.options || []).find((o) => o.id === value);
       return opt ? opt.label : String(value);
     }
+    case 'rating':
+      // Show the wording, e.g. "Agree (2)", collapsing to just the value when
+      // the scale is unlabeled so it never reads "3 (3)".
+      return formatScaleAnswer(resolveScalePoints(q), value);
     case 'yes_no': {
       if (value === true) return 'Yes';
       if (value === false) return 'No';
@@ -160,8 +163,6 @@ function formatDateTime(d) {
 /**
  * Filename-safe slug for the downloaded PDF. Includes the learner name when
  * available so a facilitator collecting several PDFs can tell them apart.
- * @param {import('@sowb/shared').Workbook} workbook
- * @param {string} [learnerName]
  */
 export function reportFileName(workbook, learnerName) {
   const base = slug(workbook.courseId || workbook.id || workbook.title || 'observation-workbook', 60) || 'workbook';

@@ -5,5 +5,5 @@
     "skipLibCheck": true, "resolveJsonModule": true, "esModuleInterop": true
   },
   "include": ["packages/**/*.js", "apps/**/*.js", "runtime-template/**/*.js", "scripts/**/*.js"],
-  "exclude": ["node_modules", "**/node_modules", "dist", "**/dist"]
+  "exclude": ["node_modules", "**/node_modules"]
 }

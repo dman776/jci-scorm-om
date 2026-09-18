@@ -9,26 +9,14 @@
  *
  * SCOPE: base-14 Helvetica / Helvetica-Bold (built into every PDF reader, so no
  * font embedding), WinAnsi encoding, flowed text with word wrapping and
- * automatic pagination. No images, no vector art beyond horizontal rules.
+ * automatic pagination. No images.
  *
- * Runs in the browser (inside the SCO) and in Node (for tests), so it uses no
- * DOM and no Node APIs. Output is a Uint8Array of PDF bytes.
+ * Runs in the browser (inside the SCO) and in Node (for tests): no DOM, no Node
+ * APIs. Output is a Uint8Array of PDF bytes.
  */
-
-const PT = 1; // we work directly in PostScript points (72 per inch)
 export const LETTER = { width: 612, height: 792 };
-
 export const FONT = { REGULAR: 'F1', BOLD: 'F2' };
 
-/**
- * A flowing, paginated text document.
- *
- * Usage:
- *   const doc = new PdfDoc({ title: 'My report' });
- *   doc.heading('Section 1');
- *   doc.paragraph('Body text');
- *   const bytes = doc.build();
- */
 export class PdfDoc {
   /**
    * @param {{ title?: string, page?: {width:number,height:number},
@@ -47,7 +35,6 @@ export class PdfDoc {
   get contentWidth() { return this.page.width - this.margin * 2; }
 
   _newPage() {
-    /** @type {string[]} */
     this.ops = [];
     this.pages.push(this.ops);
     this.y = this.page.height - this.margin;
@@ -55,50 +42,33 @@ export class PdfDoc {
 
   /** Reserve vertical space, starting a new page when the block will not fit. */
   _ensure(height) {
-    // Leave room for the footer line.
-    const floor = this.margin + 22;
+    const floor = this.margin + 22; // leave room for the footer line
     if (this.y - height < floor) this._newPage();
   }
 
-  /** @param {number} n points of blank space */
-  spacer(n = 8) {
-    this._ensure(n);
-    this.y -= n;
-  }
+  spacer(n = 8) { this._ensure(n); this.y -= n; }
 
-  /**
-   * Draw one line of text at the current cursor. Internal; callers should use
-   * paragraph()/heading() which wrap.
-   */
   _line(text, { font = FONT.REGULAR, size = 10.5, indent = 0, gray = 0 } = {}) {
     const lineHeight = size * 1.35;
     this._ensure(lineHeight);
     this.y -= lineHeight;
     const x = this.margin + indent;
     const color = gray ? `${fmt(gray)} ${fmt(gray)} ${fmt(gray)} rg\n` : '0 0 0 rg\n';
-    this.ops.push(
-      `${color}BT /${font} ${fmt(size)} Tf 1 0 0 1 ${fmt(x)} ${fmt(this.y)} Tm (${escapeText(text)}) Tj ET`
-    );
+    this.ops.push(`${color}BT /${font} ${fmt(size)} Tf 1 0 0 1 ${fmt(x)} ${fmt(this.y)} Tm (${escapeText(text)}) Tj ET`);
   }
 
-  /**
-   * Word-wrapped block of text.
-   * @param {string} text
-   * @param {{font?:string,size?:number,indent?:number,gray?:number,spaceAfter?:number}} [opts]
-   */
+  /** Word-wrapped block of text. */
   paragraph(text, opts = {}) {
     const { font = FONT.REGULAR, size = 10.5, indent = 0, gray = 0, spaceAfter = 4 } = opts;
     const maxWidth = this.contentWidth - indent;
     const source = String(text === undefined || text === null ? '' : text);
     // Respect author/learner line breaks, then wrap each resulting line.
     for (const rawLine of source.split(/\r\n|\r|\n/)) {
-      const lines = wrapText(rawLine, font, size, maxWidth);
-      for (const line of lines) this._line(line, { font, size, indent, gray });
+      for (const line of wrapText(rawLine, font, size, maxWidth)) this._line(line, { font, size, indent, gray });
     }
     if (spaceAfter) this.spacer(spaceAfter);
   }
 
-  /** @param {string} text */
   heading(text, opts = {}) {
     const { size = 14, spaceBefore = 10, spaceAfter = 4 } = opts;
     // Keep a heading with at least one following line.
@@ -129,47 +99,30 @@ export class PdfDoc {
     this._ensure(lineHeight);
     this.y -= lineHeight;
     const x = this.margin + indent;
-    this.ops.push(
-      `0 0 0 rg BT /${FONT.BOLD} ${fmt(size)} Tf 1 0 0 1 ${fmt(x)} ${fmt(this.y)} Tm (${escapeText(label)}) Tj ET`
-    );
+    this.ops.push(`0 0 0 rg BT /${FONT.BOLD} ${fmt(size)} Tf 1 0 0 1 ${fmt(x)} ${fmt(this.y)} Tm (${escapeText(label)}) Tj ET`);
     if (lines.length) {
-      this.ops.push(
-        `BT /${FONT.REGULAR} ${fmt(size)} Tf 1 0 0 1 ${fmt(x + labelWidth)} ${fmt(this.y)} Tm (${escapeText(lines[0])}) Tj ET`
-      );
+      this.ops.push(`BT /${FONT.REGULAR} ${fmt(size)} Tf 1 0 0 1 ${fmt(x + labelWidth)} ${fmt(this.y)} Tm (${escapeText(lines[0])}) Tj ET`);
     }
-    for (let i = 1; i < lines.length; i++) {
-      this._line(lines[i], { size, indent: indent + labelWidth });
-    }
+    for (let i = 1; i < lines.length; i++) this._line(lines[i], { size, indent: indent + labelWidth });
   }
 
   /** Serialize the document to PDF bytes. */
   build() {
     const objects = [];
     const pageCount = this.pages.length;
-
-    // Object numbering: 1 catalog, 2 pages, 3 font regular, 4 font bold,
-    // then per page: content stream + page object.
-    const catalogId = 1;
-    const pagesId = 2;
-    const fontRegularId = 3;
-    const fontBoldId = 4;
-    const firstPageId = 5;
-
-    /** @type {number[]} */
+    // 1 catalog, 2 pages, 3 font regular, 4 font bold, then per page:
+    // page object + content stream.
+    const catalogId = 1, pagesId = 2, fontRegularId = 3, fontBoldId = 4, firstPageId = 5;
     const pageIds = [];
     for (let i = 0; i < pageCount; i++) pageIds.push(firstPageId + i * 2);
 
     objects[catalogId] = `<< /Type /Catalog /Pages ${pagesId} 0 R >>`;
-    objects[pagesId] =
-      `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageCount} >>`;
-    objects[fontRegularId] =
-      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
-    objects[fontBoldId] =
-      '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
+    objects[pagesId] = `<< /Type /Pages /Kids [${pageIds.map((id) => `${id} 0 R`).join(' ')}] /Count ${pageCount} >>`;
+    objects[fontRegularId] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>';
+    objects[fontBoldId] = '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>';
 
     this.pages.forEach((ops, i) => {
-      const pageId = pageIds[i];
-      const contentId = pageId + 1;
+      const pageId = pageIds[i], contentId = pageId + 1;
       let stream = ops.join('\n');
       const footer = this._footerOps(i + 1, pageCount);
       if (footer) stream += '\n' + footer;
@@ -187,47 +140,31 @@ export class PdfDoc {
     const parts = [];
     if (this.footerText) parts.push(this.footerText);
     parts.push(`Page ${pageNum} of ${pageCount}`);
-    const text = parts.join('   |   ');
-    const size = 8;
     const y = this.margin - 14;
-    return `0.45 0.45 0.45 rg BT /${FONT.REGULAR} ${fmt(size)} Tf 1 0 0 1 ${fmt(this.margin)} ${fmt(y)} Tm (${escapeText(text)}) Tj ET`;
+    return `0.45 0.45 0.45 rg BT /${FONT.REGULAR} 8 Tf 1 0 0 1 ${fmt(this.margin)} ${fmt(y)} Tm (${escapeText(parts.join('   |   '))}) Tj ET`;
   }
 }
 
-// ---- PDF file assembly ---------------------------------------------------
-
-/**
- * @param {(string|{stream:string})[]} objects sparse array indexed by object id
- * @param {number} rootId
- * @param {string} title
- * @returns {Uint8Array}
- */
+/** @returns {Uint8Array} */
 function assemble(objects, rootId, title) {
   const chunks = [];
   let length = 0;
-  const push = (s) => { chunks.push(s); length += byteLength(s); };
+  const push = (s) => { chunks.push(s); length += s.length; };
 
   push('%PDF-1.4\n');
   // Binary comment marks the file as containing binary data.
   push('%\xE2\xE3\xCF\xD3\n');
 
   const maxId = objects.length - 1;
-  /** @type {number[]} */
   const offsets = [];
-
   for (let id = 1; id <= maxId; id++) {
     const obj = objects[id];
     if (obj === undefined) continue;
     offsets[id] = length;
-    if (typeof obj === 'string') {
-      push(`${id} 0 obj\n${obj}\nendobj\n`);
-    } else {
-      const stream = obj.stream;
-      push(`${id} 0 obj\n<< /Length ${byteLength(stream)} >>\nstream\n${stream}\nendstream\nendobj\n`);
-    }
+    if (typeof obj === 'string') push(`${id} 0 obj\n${obj}\nendobj\n`);
+    else push(`${id} 0 obj\n<< /Length ${obj.stream.length} >>\nstream\n${obj.stream}\nendstream\nendobj\n`);
   }
 
-  // Info object with the document title.
   const infoId = maxId + 1;
   offsets[infoId] = length;
   push(`${infoId} 0 obj\n<< /Title (${escapeText(title)}) /Producer (SCORM Observation Workbook) >>\nendobj\n`);
@@ -242,26 +179,17 @@ function assemble(objects, rootId, title) {
   push(xref);
   push(`trailer\n<< /Size ${size} /Root ${rootId} 0 R /Info ${infoId} 0 R >>\nstartxref\n${xrefOffset}\n%%EOF\n`);
 
-  // Each chunk is a latin1-safe string; convert to bytes 1:1.
+  // Every chunk is a latin1-safe string; convert to bytes 1:1.
   const bytes = new Uint8Array(length);
   let p = 0;
-  for (const chunk of chunks) {
-    for (let i = 0; i < chunk.length; i++) bytes[p++] = chunk.charCodeAt(i) & 0xff;
-  }
+  for (const chunk of chunks) for (let i = 0; i < chunk.length; i++) bytes[p++] = chunk.charCodeAt(i) & 0xff;
   return bytes;
 }
 
-function byteLength(s) {
-  // Every character we emit is already a single byte (latin1/WinAnsi).
-  return s.length;
-}
-
-// ---- text encoding -------------------------------------------------------
-
 /**
- * Characters learners routinely paste from Word that are not in WinAnsi's
- * ASCII range. Mapped to safe equivalents so the PDF never contains a
- * character the base-14 encoding cannot express.
+ * Characters learners routinely paste from Word that are outside the ASCII
+ * range WinAnsi text can safely carry. Mapped to safe equivalents so the PDF
+ * never contains a character the base-14 encoding cannot express.
  */
 const SUBSTITUTIONS = {
   '\u2018': "'", '\u2019': "'", '\u201A': ',', '\u201B': "'",
@@ -274,11 +202,7 @@ const SUBSTITUTIONS = {
   '\t': '    ',
 };
 
-/**
- * Convert a JS string to a WinAnsi-safe byte string and escape PDF syntax.
- * @param {string} text
- * @returns {string}
- */
+/** Convert a JS string to WinAnsi-safe bytes and escape PDF syntax. */
 export function escapeText(text) {
   const src = String(text === undefined || text === null ? '' : text);
   let out = '';
@@ -286,8 +210,7 @@ export function escapeText(text) {
     const sub = SUBSTITUTIONS[ch];
     const piece = sub !== undefined ? sub : ch;
     for (let i = 0; i < piece.length; i++) {
-      const c = piece[i];
-      const code = piece.charCodeAt(i);
+      const c = piece[i], code = piece.charCodeAt(i);
       if (c === '\\' || c === '(' || c === ')') out += '\\' + c;
       else if (code >= 32 && code <= 126) out += c;
       else if (code >= 160 && code <= 255) out += '\\' + code.toString(8).padStart(3, '0');
@@ -296,8 +219,6 @@ export function escapeText(text) {
   }
   return out;
 }
-
-// ---- metrics + wrapping --------------------------------------------------
 
 // Adobe base-14 widths (units per 1000) for printable ASCII 32-126.
 const HELVETICA = [
@@ -321,14 +242,12 @@ const HELVETICA_BOLD = [
 export function measure(text, font, size) {
   const table = font === FONT.BOLD ? HELVETICA_BOLD : HELVETICA;
   let units = 0;
-  const src = String(text || '');
-  for (const ch of src) {
+  for (const ch of String(text || '')) {
     const sub = SUBSTITUTIONS[ch];
     const piece = sub !== undefined ? sub : ch;
     for (let i = 0; i < piece.length; i++) {
       const code = piece.charCodeAt(i);
-      if (code >= 32 && code <= 126) units += table[code - 32];
-      else units += 556; // reasonable default for accented/unknown glyphs
+      units += (code >= 32 && code <= 126) ? table[code - 32] : 556;
     }
   }
   return (units / 1000) * size;
@@ -343,29 +262,18 @@ export function wrapText(text, font, size, maxWidth) {
   const src = String(text === undefined || text === null ? '' : text);
   if (src.trim() === '') return [''];
   const words = src.split(/\s+/).filter((w) => w.length > 0);
-  /** @type {string[]} */
   const lines = [];
   let line = '';
-
   for (const word of words) {
     const candidate = line ? line + ' ' + word : word;
-    if (measure(candidate, font, size) <= maxWidth) {
-      line = candidate;
-      continue;
-    }
+    if (measure(candidate, font, size) <= maxWidth) { line = candidate; continue; }
     if (line) { lines.push(line); line = ''; }
-    if (measure(word, font, size) <= maxWidth) {
-      line = word;
-    } else {
-      // Hard-split an over-long token.
+    if (measure(word, font, size) <= maxWidth) { line = word; }
+    else {
       let piece = '';
       for (const ch of word) {
-        if (measure(piece + ch, font, size) > maxWidth && piece) {
-          lines.push(piece);
-          piece = ch;
-        } else {
-          piece += ch;
-        }
+        if (measure(piece + ch, font, size) > maxWidth && piece) { lines.push(piece); piece = ch; }
+        else piece += ch;
       }
       line = piece;
     }

@@ -9,7 +9,8 @@
     body { background: #eef1f7; }
     .harness-bar {
       position: sticky; top: 0; z-index: 20; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-      background: #10233f; color: #fff; padding: 10px 16px; font-family: "Segoe UI", system-ui, sans-serif; font-size: 13px;
+      background: #10233f; color: #fff; padding: 10px 16px;
+      font-family: "Segoe UI", system-ui, sans-serif; font-size: 13px;
     }
     .harness-bar strong { margin-right: 6px; }
     .harness-bar button { background: #2c5cc5; color: #fff; border: none; border-radius: 6px; padding: 7px 12px; font-size: 13px; cursor: pointer; }
@@ -60,11 +61,10 @@
       launch(); // relaunch -> cmi.entry becomes 'resume', state restored, lands on dashboard
     });
     document.getElementById('reset').addEventListener('click', () => {
-      lms.persistent['cmi.suspend_data'] = '';
-      lms.persistent['cmi.exit'] = '';
-      lms.persistent['cmi.location'] = '';
-      lms.persistent['cmi.completion_status'] = 'unknown';
-      lms.persistent['cmi.progress_measure'] = '';
+      Object.assign(lms.persistent, {
+        'cmi.suspend_data': '', 'cmi.exit': '', 'cmi.location': '',
+        'cmi.completion_status': 'unknown', 'cmi.progress_measure': '',
+      });
       launch();
     });
     debugToggle.addEventListener('change', () => { if (player) { player.debug = debugToggle.checked; player.render(); } });

@@ -12,34 +12,15 @@ class Store {
   constructor() {
     this.workbook = migrate(this._load() || blank());
     this.dirty = false;
-    /** @type {Set<Function>} */
     this.subs = new Set();
   }
-
   subscribe(fn) { this.subs.add(fn); return () => this.subs.delete(fn); }
   _emit() { for (const fn of this.subs) fn(this.workbook); }
-
-  _load() {
-    try { const raw = localStorage.getItem(LS_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; }
-  }
-  persist() {
-    try { localStorage.setItem(LS_KEY, JSON.stringify(this.workbook)); } catch { /* ignore */ }
-  }
-
-  set(workbook) {
-    this.workbook = migrate(workbook);
-    this.dirty = true;
-    this.persist();
-    this._emit();
-  }
-  update(mutator) {
-    mutator(this.workbook);
-    this.dirty = true;
-    this.persist();
-    this._emit();
-  }
+  _load() { try { const raw = localStorage.getItem(LS_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; } }
+  persist() { try { localStorage.setItem(LS_KEY, JSON.stringify(this.workbook)); } catch { /* ignore */ } }
+  set(workbook) { this.workbook = migrate(workbook); this.dirty = true; this.persist(); this._emit(); }
+  update(mutator) { mutator(this.workbook); this.dirty = true; this.persist(); this._emit(); }
   markSaved() { this.dirty = false; }
-
   hasContent() {
     return (this.workbook.sections || []).length > 0 ||
       (this.workbook.title && this.workbook.title !== 'Untitled Observation Workbook');
@@ -47,9 +28,7 @@ class Store {
 
   // ---- section ops ----
   addSection() {
-    this.update((wb) => {
-      wb.sections.push({ id: newSectionId(), title: 'New Section', required: true, questions: [] });
-    });
+    this.update((wb) => wb.sections.push({ id: newSectionId(), title: 'New Section', required: true, questions: [] }));
   }
   duplicateSection(id) {
     this.update((wb) => {
@@ -62,12 +41,8 @@ class Store {
       wb.sections.splice(idx + 1, 0, copy);
     });
   }
-  deleteSection(id) {
-    this.update((wb) => { wb.sections = wb.sections.filter((s) => s.id !== id); });
-  }
-  moveSection(id, dir) {
-    this.update((wb) => move(wb.sections, wb.sections.findIndex((s) => s.id === id), dir));
-  }
+  deleteSection(id) { this.update((wb) => { wb.sections = wb.sections.filter((s) => s.id !== id); }); }
+  moveSection(id, dir) { this.update((wb) => move(wb.sections, wb.sections.findIndex((s) => s.id === id), dir)); }
 
   // ---- question ops ----
   addQuestion(sectionId, type = 'short_text') {
@@ -102,12 +77,12 @@ class Store {
 }
 
 export function newQuestion(type) {
-  /** @type {any} */
   const q = { id: newQuestionId(), type, prompt: 'New question', required: true };
   if (['single_select', 'multiple_select', 'checklist'].includes(type)) {
     q.options = [{ id: newOptionId(), label: 'Option 1' }, { id: newOptionId(), label: 'Option 2' }];
   }
-  if (type === 'rating') q.scale = [1, 2, 3, 4, 5];
+  // New rating questions default to the numeric built-in.
+  if (type === 'rating') q.scaleId = 'numeric-5';
   return q;
 }
 
@@ -117,7 +92,7 @@ function blank() {
     author: '', courseId: '', estimatedDuration: '',
     settings: {
       language: 'en-US', navigation: 'free', completionRule: 'all-required-sections',
-      reportSuccess: false, dashboardHeading: 'Your observation workbook',
+      reportSuccess: false, dashboardHeading: 'Your observation workbook', allowPdfDownload: true,
     },
     sections: [],
   };
@@ -128,6 +103,8 @@ function migrate(wb) {
   if (!wb || typeof wb !== 'object') return blank();
   wb.settings = wb.settings || {};
   if (!wb.settings.dashboardHeading) wb.settings.dashboardHeading = 'Your observation workbook';
+  // Absent means "on", matching the runtime default.
+  if (wb.settings.allowPdfDownload === undefined) wb.settings.allowPdfDownload = true;
   return wb;
 }
 

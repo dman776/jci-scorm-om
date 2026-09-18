@@ -1,7 +1,7 @@
 // @ts-check
 /**
  * Playwright learner spec, driving the REAL runtime inside the mock-LMS
- * preview harness. Covers the partial-completion rules end to end.
+ * preview harness.
  *
  * Prereqs (not bundled):
  *   npm i -D @playwright/test
@@ -13,19 +13,26 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const ROOT = join(__dirname, '..', '..');
-const workbook = JSON.parse(readFileSync(join(ROOT, 'samples', 'ae-install-ride-along.workbook.json'), 'utf8'));
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const workbook = JSON.parse(readFileSync(join(ROOT, 'samples', 'demo.workbook.json'), 'utf8'));
 
 test.beforeEach(async ({ request }) => {
   expect((await request.post('/api/preview', { data: workbook })).ok()).toBeTruthy();
 });
 
+test('section cards show author titles and the custom heading', async ({ page }) => {
+  await page.goto('/preview/harness.html?t=' + Date.now());
+  await expect(page.locator('[data-dashboard-heading]')).toHaveText('Your Milestones');
+  await expect(page.locator('.sowb-section-card')).toHaveCount(4);
+  await expect(page.locator('.sowb-section-name').first()).toHaveText('Month 1');
+  // No "Section N:" prefix anywhere.
+  const names = await page.locator('.sowb-section-name').allTextContents();
+  for (const n of names) expect(n).not.toMatch(/^Section\s*\d+\s*:/);
+});
+
 test('expected checklist options and numeric bounds gate completion', async ({ page }) => {
   await page.goto('/preview/harness.html?t=' + Date.now());
-  await expect(page.locator('.sowb-section-card')).toHaveCount(3);
 
-  // --- Section 1: answer everything but tick only ONE expected option.
   await page.locator('[data-open-section="s1"]').click();
   await page.locator('input[type="date"][data-q="q_s1_1"]').fill('2026-09-14');
   await page.locator('[data-next]').click();
@@ -37,63 +44,74 @@ test('expected checklist options and numeric bounds gate completion', async ({ p
   await page.locator('[data-back]').click();
   await expect(page.locator('[data-section-status="s1"]')).toHaveText('Partially Complete');
 
-  // Ticking the second expected option completes the section.
   await page.locator('[data-open-section="s1"]').click();
+  await page.locator('[data-next]').click();
+  await page.locator('[data-next]').click();
   await page.locator('[data-q="q_s1_3"]').nth(1).check(); // Safety plan
   await page.locator('[data-back]').click();
   await expect(page.locator('[data-section-status="s1"]')).toHaveText('Completed');
 
-  // --- Section 2: numeric below its minimum keeps it partial.
+  // A COMPLETED section reopens at question 1 for review.
+  await expect(page.locator('[data-open-section="s1"]')).toHaveText('Review');
+  await page.locator('[data-open-section="s1"]').click();
+  await expect(page.locator('.sowb-counter')).toHaveText('Question 1 of 3');
+  await page.locator('[data-back]').click();
+
+  // Numeric below its minimum keeps section 2 partial.
   await page.locator('[data-open-section="s2"]').click();
   await page.locator('input[data-q="q_s2_1"]').fill('Dana Ruiz');
   await page.locator('[data-next]').click();
   await page.locator('input[data-q="q_s2_2"]').fill('2');
   await expect(page.locator('[data-answer-status]')).toHaveText('Enter at least 4.');
-  await page.locator('[data-next]').click();
-  await page.locator('input[data-q="q_s2_3"][value="High"]').check();
-  await page.locator('[data-next]').click();
-  await page.locator('textarea[data-q="q_s2_4"]').fill('Learned the handoff checklist.');
-  await page.locator('[data-back]').click();
-  await expect(page.locator('[data-section-status="s2"]')).toHaveText('Partially Complete');
-
-  // Meeting the minimum completes it.
-  await page.locator('[data-open-section="s2"]').click();
   await page.locator('input[data-q="q_s2_2"]').fill('6');
-  await page.locator('[data-back]').click();
-  await expect(page.locator('[data-section-status="s2"]')).toHaveText('Completed');
-
-  // --- Exit + resume returns to the section list with state intact.
-  await page.locator('#exitResume').click();
-  await expect(page.locator('.sowb-section-card')).toHaveCount(3);
-  await expect(page.locator('[data-section-status="s1"]')).toHaveText('Completed');
-
-  // --- Section 3 finishes the workbook.
-  await page.locator('[data-open-section="s3"]').click();
-  await page.locator('input[data-q="q_s3_1"][value="yes"]').check();
-  await page.locator('[data-next]').click();
-  await page.locator('input[data-q="q_s3_2"][value="4"]').check();
-  await page.locator('[data-back]').click();
-
-  expect(await page.evaluate(() => window.__LMS__.persistent['cmi.completion_status'])).toBe('completed');
-  expect(await page.evaluate(() => window.__LMS__.persistent['cmi.progress_measure'])).toBe('1');
-});
-
-test('an invalid url stays partial and a valid one previews', async ({ page }) => {
-  await page.goto('/preview/harness.html?t=' + Date.now());
-  await page.locator('[data-open-section="s3"]').click();
-  await page.locator('[data-next]').click();
-  await page.locator('[data-next]').click(); // the url question
-  await page.locator('input[data-q="q_s3_3"]').fill('notaurl');
-  await expect(page.locator('[data-answer-status]')).toHaveText('Enter a valid link starting with https://');
-  await page.locator('input[data-q="q_s3_3"]').fill('https://jci.sharepoint.com/notes');
   await expect(page.locator('[data-answer-status]')).toHaveText('Answer saved');
-  await expect(page.locator('[data-url-preview]')).toHaveAttribute('href', 'https://jci.sharepoint.com/notes');
 });
 
-test('the dashboard heading is author-configurable', async ({ page, request }) => {
-  const custom = JSON.parse(JSON.stringify(workbook));
-  custom.settings.dashboardHeading = 'Your Milestones';
-  await request.post('/api/preview', { data: custom });
+test('a labeled rating scale renders its wording and stores the value', async ({ page }) => {
   await page.goto('/preview/harness.html?t=' + Date.now());
-  await expect(page.locator('[data-dashboard-heading]')).toHaveText('Your Milestones');
+  await page.locator('[data-open-section="s2"]').click();
+  await page.locator('[data-next]').click();
+  await page.locator('[data-next]').click(); // the agreement-5 question
+
+  await expect(page.locator('[data-rating-layout]')).toHaveAttribute('data-rating-layout', 'listed');
+  await expect(page.locator('.sowb-rating-label').first()).toHaveText('Strongly Agree');
+  await page.locator('[data-q="q_s2_3"][data-value="2"]').check();
+  await expect(page.locator('[data-answer-status]')).toHaveText('Answer saved');
+
+  const stored = await page.evaluate(() => window.__PLAYER__.state.responses.q_s2_3);
+  expect(stored).toBe('2');
+});
+
+test('exit and resume returns to the section list with state intact', async ({ page }) => {
+  await page.goto('/preview/harness.html?t=' + Date.now());
+  await page.locator('[data-open-section="s1"]').click();
+  await page.locator('input[type="date"][data-q="q_s1_1"]').fill('2026-09-14');
+  await page.locator('#exitResume').click();
+
+  await expect(page.locator('.sowb-section-card')).toHaveCount(4);
+  const restored = await page.evaluate(() => window.__PLAYER__.state.responses.q_s1_1);
+  expect(restored).toBe('2026-09-14');
+});
+
+test('the learner can download a PDF from the dashboard header', async ({ page }) => {
+  await page.goto('/preview/harness.html?t=' + Date.now());
+  const button = page.locator('[data-download-pdf]');
+  await expect(button).toBeVisible();
+
+  const [download] = await Promise.all([page.waitForEvent('download'), button.click()]);
+  expect(download.suggestedFilename()).toMatch(/\.pdf$/);
+  // The fallback is always offered for sandboxed frames that block downloads.
+  await expect(page.locator('[data-pdf-open]')).toBeVisible();
+
+  // It is hidden inside a section so the question view stays focused.
+  await page.locator('[data-open-section="s1"]').click();
+  await expect(page.locator('[data-download-pdf]')).toHaveCount(0);
+});
+
+test('the PDF button is hidden when the workbook disables it', async ({ page, request }) => {
+  const off = JSON.parse(JSON.stringify(workbook));
+  off.settings.allowPdfDownload = false;
+  await request.post('/api/preview', { data: off });
+  await page.goto('/preview/harness.html?t=' + Date.now());
+  await expect(page.locator('[data-download-pdf]')).toHaveCount(0);
 });

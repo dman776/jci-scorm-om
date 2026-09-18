@@ -1,6 +1,1 @@
-{
-  "name": "@sowb/mock-lms",
-  "version": "1.1.0",
-  "type": "module",
-  "main": "index.js"
-}
+{ "name": "@sowb/mock-lms", "version": "1.4.0", "type": "module", "main": "index.js" }

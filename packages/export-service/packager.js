@@ -6,10 +6,7 @@
  */
 import JSZip from 'jszip';
 
-/**
- * @param {Record<string,string|Uint8Array>} fileMap
- * @returns {Promise<Buffer>}
- */
+/** @param {Record<string,string|Uint8Array>} fileMap @returns {Promise<Buffer>} */
 export async function zipFileMap(fileMap) {
   const zip = new JSZip();
   for (const [path, content] of Object.entries(fileMap)) zip.file(path, content);
@@ -22,11 +19,7 @@ export async function zipFileMap(fileMap) {
   });
 }
 
-/**
- * Read a ZIP buffer back into a file map (used by tests + round-trips).
- * @param {Buffer|Uint8Array} buffer
- * @returns {Promise<Record<string,string>>}
- */
+/** Read a ZIP buffer back into a file map (tests + round-trips). */
 export async function unzipToMap(buffer) {
   const zip = await JSZip.loadAsync(buffer);
   /** @type {Record<string,string>} */

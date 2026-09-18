@@ -27,7 +27,10 @@ export async function renderLibrary(mount, { store, api, navigate }) {
       const items = await api.listWorkbooks();
       if (!items.length) { listEl.appendChild(h('p.muted', 'No saved workbooks yet.')); return; }
       listEl.appendChild(h('ul.lib-items', items.map((w) => h('li.lib-item', [
-        h('div.lib-item-main', [h('span.lib-name', w.title), h('span.lib-meta', `v${w.version} \u00b7 ${w.sections} section${w.sections === 1 ? '' : 's'} \u00b7 ${w.id}`)]),
+        h('div.lib-item-main', [
+          h('span.lib-name', w.title),
+          h('span.lib-meta', `v${w.version} \u00b7 ${w.sections} section${w.sections === 1 ? '' : 's'} \u00b7 ${w.id}`),
+        ]),
         h('div.lib-item-actions', [
           h('button.btn.small', { onclick: () => onOpen(w.id) }, 'Open'),
           h('button.btn.small.ghost', { onclick: () => onDelete(w.id) }, 'Delete'),
@@ -47,8 +50,7 @@ export async function renderLibrary(mount, { store, api, navigate }) {
   async function onOpen(id) {
     if (store.dirty && !(await confirmDialog('Open another workbook? Unsaved changes will be lost.'))) return;
     const wb = await api.getWorkbook(id);
-    store.set(wb);
-    store.markSaved();
+    store.set(wb); store.markSaved();
     toast('Opened ' + wb.title, 'success');
     navigate('editor');
   }
@@ -67,23 +69,16 @@ export async function renderLibrary(mount, { store, api, navigate }) {
       toast(`Imported ${workbook.sections.length} sections` + (warnings.length ? ` (${warnings.length} warnings)` : ''), warnings.length ? 'info' : 'success');
       if (warnings.length) console.warn('Import warnings:', warnings);
       navigate('editor');
-    } catch (err) {
-      toast('Import failed: ' + err.message, 'error');
-    }
+    } catch (err) { toast('Import failed: ' + err.message, 'error'); }
   }
   async function onImportJson(e) {
     const file = e.target.files[0];
     if (!file) return;
-    try {
-      store.set(JSON.parse(await file.text()));
-      toast('Project JSON imported', 'success');
-      navigate('editor');
-    } catch (err) {
-      toast('Invalid JSON: ' + err.message, 'error');
-    }
+    try { store.set(JSON.parse(await file.text())); toast('Project JSON imported', 'success'); navigate('editor'); }
+    catch (err) { toast('Invalid JSON: ' + err.message, 'error'); }
   }
   function onExportJson() {
-    const blob = new Blob([JSON.stringify(store.workbook, null, 2)], { type: 'application/json' });
-    downloadBlob(blob, (store.workbook.id || 'workbook') + '.workbook.json');
+    downloadBlob(new Blob([JSON.stringify(store.workbook, null, 2)], { type: 'application/json' }),
+      (store.workbook.id || 'workbook') + '.workbook.json');
   }
 }

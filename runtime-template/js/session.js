@@ -2,23 +2,20 @@
 /**
  * SessionCore - the DOM-free heart of the learner runtime.
  *
- * Owns all SCORM interaction and learner-state bookkeeping: initialize,
- * resume, auto-save, completion/progress reporting, and suspend-on-exit. The
- * DOM player (player.js) wraps a SessionCore and only renders; the headless
- * mock-LMS tests drive a SessionCore directly, so the exact same persistence
- * logic runs in preview, in the exported package, and under test.
+ * Owns all SCORM interaction and learner-state bookkeeping: initialize, resume,
+ * auto-save, completion/progress reporting, and suspend-on-exit. The DOM player
+ * (player.js) wraps a SessionCore and only renders; the headless mock-LMS tests
+ * drive a SessionCore directly, so the exact same persistence logic runs in
+ * preview, in the exported package, and under test.
  */
 import {
-  computeAllSectionStatus,
-  computeProgressMeasure,
-  isWorkbookComplete,
-  isSectionUnlocked,
-  COMPLETED,
+  computeAllSectionStatus, computeProgressMeasure,
+  isWorkbookComplete, isSectionUnlocked, COMPLETED,
 } from './engine/completion.js';
 import { serializeState, deserializeState, estimateSuspendSize } from './engine/suspend.js';
 
 export class SessionCore {
-  /** @param {{ workbook: import('@sowb/shared').Workbook, adapter: any }} opts */
+  /** @param {{ workbook: any, adapter: any }} opts */
   constructor(opts) {
     this.workbook = opts.workbook;
     this.adapter = opts.adapter;
@@ -26,7 +23,6 @@ export class SessionCore {
     this._exited = false;
     /** Learner identity reported by the LMS, read once at init. */
     this._learnerName = '';
-    /** @type {import('@sowb/shared').LearnerState} */
     this.state = {
       currentSection: (this.workbook.sections[0] || {}).id || '',
       currentPage: 0,
@@ -37,9 +33,9 @@ export class SessionCore {
 
   init() {
     this.adapter.initialize();
-    // cmi.learner_name is read-only and supplied by the LMS. Capture it once
-    // at launch so the PDF report can identify the learner. It is never
-    // written to suspend data (the LMS already owns it).
+    // cmi.learner_name is read-only and supplied by the LMS. Capture it once at
+    // launch so the PDF report can identify the learner. It is never written to
+    // suspend data (the LMS already owns it).
     this._learnerName = normalizeLearnerName(this.adapter.getValue('cmi.learner_name'));
 
     const entry = this.adapter.getValue('cmi.entry');
@@ -53,10 +49,7 @@ export class SessionCore {
     return { entry, resumed: entry === 'resume', learnerName: this._learnerName };
   }
 
-  /**
-   * The learner's display name from the LMS, or '' when unavailable (for
-   * example during standalone local preview with no LMS present).
-   */
+  /** Learner display name from the LMS, or '' when unavailable. */
   learnerName() { return this._learnerName; }
 
   _applyLocation(loc) {
@@ -64,7 +57,6 @@ export class SessionCore {
     if (sid) this.state.currentSection = sid;
     if (page !== undefined) this.state.currentPage = parseInt(page, 10) || 0;
   }
-
   location() { return `${this.state.currentSection}:${this.state.currentPage}`; }
 
   /** Write full state to the LMS and Commit. Called after every page + change. */
@@ -74,8 +66,8 @@ export class SessionCore {
     this.adapter.setValue('cmi.suspend_data', serializeState(this.state));
     this.adapter.setValue('cmi.progress_measure', String(this.progress()));
     const complete = isWorkbookComplete(this.workbook, this.state.sectionStatus);
-    // SCORM 2004 has no "partial" completion value; partially complete
-    // sections still report the workbook as incomplete.
+    // SCORM 2004 has no "partial" completion value; partially complete sections
+    // still report the workbook as incomplete.
     this.adapter.setValue('cmi.completion_status', complete ? 'completed' : 'incomplete');
     if (this.workbook.settings && this.workbook.settings.reportSuccess) {
       this.adapter.setValue('cmi.success_status', complete ? 'passed' : 'unknown');
@@ -89,6 +81,7 @@ export class SessionCore {
     return this.save();
   }
 
+  /** Question-level progress measure (partial responses do not count). */
   progress() { return computeProgressMeasure(this.workbook, this.state.sectionStatus, this.state.responses); }
   isComplete() { return isWorkbookComplete(this.workbook, this.state.sectionStatus); }
   isUnlocked(sectionId) { return isSectionUnlocked(this.workbook, sectionId, this.state.sectionStatus); }
@@ -102,9 +95,7 @@ export class SessionCore {
     // COMPLETED section (the learner is reviewing, so begin at the top).
     // Otherwise resume at the saved page so "Continue" lands in place.
     const reviewing = this.state.sectionStatus[sectionId] === COMPLETED;
-    if (sectionId !== this.state.currentSection || reviewing) {
-      this.state.currentPage = 0;
-    }
+    if (sectionId !== this.state.currentSection || reviewing) this.state.currentPage = 0;
     this.state.currentSection = sectionId;
     this.save();
     return true;
@@ -114,9 +105,8 @@ export class SessionCore {
     const section = this.currentSection();
     if (this.state.currentPage < section.questions.length - 1) { this.state.currentPage++; this.save(); return true; }
     this.save();
-    return false;
+    return false; // caller returns to the dashboard
   }
-
   prevPage() {
     if (this.state.currentPage > 0) { this.state.currentPage--; this.save(); return true; }
     this.save();
@@ -138,9 +128,9 @@ export class SessionCore {
 }
 
 /**
- * LMSs commonly report cmi.learner_name in "Last, First" form. Flip it to
- * "First Last" for a natural reading in the report heading, and trim noise.
- * Anything that does not look like a simple "Last, First" pair is left as-is.
+ * LMSs commonly report cmi.learner_name as "Last, First". Flip it to
+ * "First Last" for a natural reading. Anything that is not a simple two-part
+ * comma pair is left as-is.
  * @param {string} raw
  * @returns {string}
  */
@@ -149,8 +139,7 @@ export function normalizeLearnerName(raw) {
   if (!name) return '';
   const parts = name.split(',');
   if (parts.length === 2) {
-    const last = parts[0].trim();
-    const first = parts[1].trim();
+    const last = parts[0].trim(), first = parts[1].trim();
     if (last && first) return `${first} ${last}`;
   }
   return name;

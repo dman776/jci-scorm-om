@@ -5,6 +5,7 @@ import { api } from './api.js';
 import { renderLibrary } from './screens/library.js';
 import { renderSettings } from './screens/settings.js';
 import { renderEditor } from './screens/editor.js';
+import { renderScales } from './screens/scales.js';
 import { renderPreview } from './screens/preview.js';
 import { renderPublish } from './screens/publish.js';
 import { renderHelp } from './screens/help.js';
@@ -13,11 +14,11 @@ const SCREENS = {
   library: { label: 'Library', icon: 'folder', render: renderLibrary },
   settings: { label: 'Workbook Settings', icon: 'gear', render: renderSettings },
   editor: { label: 'Sections', icon: 'list', render: renderEditor },
+  scales: { label: 'Rating Scales', icon: 'scale', render: renderScales },
   preview: { label: 'Preview', icon: 'play', render: renderPreview },
   publish: { label: 'Publish', icon: 'box', render: renderPublish },
   help: { label: 'Help & Guide', icon: 'help', render: renderHelp },
 };
-
 let current = 'editor';
 
 function navigate(screen) {
@@ -39,14 +40,13 @@ function renderShell() {
 }
 
 function renderTopbar() {
-  const dirtyDot = store.dirty ? h('span.dirty-dot', { title: 'Unsaved changes' }) : null;
   return h('header.topbar', [
     h('div.brand', [
       h('span.brand-mark', { text: 'SOWB' }),
       h('span.brand-name', { text: 'SCORM Observation Workbook Builder' }),
     ]),
     h('div.top-actions', [
-      h('span.wb-title-chip', [store.workbook.title, dirtyDot]),
+      h('span.wb-title-chip', [store.workbook.title, store.dirty ? h('span.dirty-dot', { title: 'Unsaved changes' }) : null]),
       h('button.btn.ghost', { onclick: onSave }, 'Save'),
       h('button.btn', { onclick: () => navigate('publish') }, 'Publish'),
       h('a.top-link', { href: '#help', onclick: (e) => { e.preventDefault(); navigate('help'); } }, 'Help'),
@@ -56,14 +56,10 @@ function renderTopbar() {
 
 function renderSidebar() {
   const items = Object.entries(SCREENS).map(([key, s]) =>
-    h('button.nav-item' + (key === current ? '.active' : ''), {
-      onclick: () => navigate(key),
-    }, [h('span.nav-ico.ico-' + s.icon), s.label]));
+    h('button.nav-item' + (key === current ? '.active' : ''), { onclick: () => navigate(key) },
+      [h('span.nav-ico.ico-' + s.icon), s.label]));
   // A small, discrete build credit pinned to the bottom of the nav pane.
-  return h('nav.sidebar', [
-    h('div.nav-items', items),
-    h('div.sidebar-credit', 'Built by Darryl Quinn'),
-  ]);
+  return h('nav.sidebar', [h('div.nav-items', items), h('div.sidebar-credit', 'Built by Darryl Quinn')]);
 }
 
 async function onSave() {
@@ -82,7 +78,6 @@ store.subscribe(() => {
   const chip = document.querySelector('.wb-title-chip');
   if (chip && chip.firstChild) chip.firstChild.textContent = store.workbook.title;
 });
-
 window.addEventListener('hashchange', () => {
   const s = location.hash.replace('#', '');
   if (s && SCREENS[s] && s !== current) { current = s; renderShell(); }
