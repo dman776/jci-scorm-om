@@ -44,9 +44,11 @@ test('expected checklist options and numeric bounds gate completion', async ({ p
   await page.locator('[data-back]').click();
   await expect(page.locator('[data-section-status="s1"]')).toHaveText('Partially Complete');
 
+  // A PARTIALLY COMPLETE section resumes in place, so Continue lands back on
+  // the checklist rather than at question 1.
+  await expect(page.locator('[data-open-section="s1"]')).toHaveText('Continue');
   await page.locator('[data-open-section="s1"]').click();
-  await page.locator('[data-next]').click();
-  await page.locator('[data-next]').click();
+  await expect(page.locator('.sowb-counter')).toHaveText('Question 3 of 3');
   await page.locator('[data-q="q_s1_3"]').nth(1).check(); // Safety plan
   await page.locator('[data-back]').click();
   await expect(page.locator('[data-section-status="s1"]')).toHaveText('Completed');
