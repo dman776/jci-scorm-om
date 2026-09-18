@@ -8,7 +8,7 @@
  *
  * Expected options: prefix an option label with `*` to mark it expected, e.g.
  *   Scope review | *Safety plan | Schedule
- * For checklist and multiple_select, the learner must select every expected
+ * For checklist and multiple_select the learner must select every expected
  * option for the question to count as complete.
  */
 import { writeXlsx, readXlsx } from './index.js';
@@ -17,7 +17,6 @@ import { newOptionId } from '@sowb/shared/ids.js';
 /**
  * Parse an uploaded xlsx buffer into a workbook object.
  * @param {Buffer|Uint8Array} buffer
- * @returns {Promise<{ workbook: import('@sowb/shared').Workbook, warnings: string[] }>}
  */
 export async function importWorkbookXlsx(buffer) {
   const sheets = await readXlsx(buffer);
@@ -36,7 +35,6 @@ export async function importWorkbookXlsx(buffer) {
   const sections = parseSections(sectionRows, warnings);
   attachQuestions(sections, questionRows, warnings);
 
-  /** @type {import('@sowb/shared').Workbook} */
   const workbook = {
     id: settings.id || slug(settings.title || 'imported-workbook'),
     title: settings.title || 'Imported Observation Workbook',
@@ -51,17 +49,16 @@ export async function importWorkbookXlsx(buffer) {
       completionRule: 'all-required-sections',
       reportSuccess: toBool(settings.reportSuccess),
       dashboardHeading: settings.dashboardHeading || 'Your observation workbook',
+      // Default ON when the key is absent, so older templates keep the button.
+      allowPdfDownload: settings.allowPdfDownload === '' || settings.allowPdfDownload === undefined
+        ? true : toBool(settings.allowPdfDownload),
     },
     sections: sections.map(({ _order, ...s }) => s),
   };
   return { workbook, warnings };
 }
 
-/**
- * Build template.xlsx with Instructions, Settings, Sections, Questions sheets
- * and a valid mini example workbook that round-trips through the importer.
- * @returns {Promise<Buffer>}
- */
+/** Build template.xlsx with a valid mini example workbook that round-trips. */
 export async function buildTemplateXlsx() {
   const instructions = [
     ['SCORM Observation Workbook Builder - Excel Import Template'],
@@ -69,7 +66,9 @@ export async function buildTemplateXlsx() {
     ['Fill in the Settings, Sections, and Questions sheets, then import this file from the authoring app.'],
     [''],
     ['SETTINGS sheet: one Key/Value pair per row.'],
-    ['  Dashboard Heading  The learner-facing heading on the section list, e.g. "Your Milestones".'],
+    ['  Dashboard Heading    The learner-facing heading on the section list, e.g. "Your Milestones".'],
+    ['  Allow PDF Download   yes or no. Shows learners a button to download a PDF of their responses.'],
+    ['                       Defaults to yes when the key is absent.'],
     ['SECTIONS sheet: one row per section. Columns: Section ID, Title, Required (yes/no), Order.'],
     ['QUESTIONS sheet: one row per question. Columns below.'],
     [''],
@@ -106,6 +105,7 @@ export async function buildTemplateXlsx() {
     ['Author', 'JCI ASCEND Learning'],
     ['Language', 'en-US'],
     ['Dashboard Heading', 'Your observation workbook'],
+    ['Allow PDF Download', 'yes'],
     ['Navigation', 'free'],
     ['Completion Rule', 'all-required-sections'],
     ['Report Success', 'no'],
@@ -146,7 +146,6 @@ export async function buildTemplateXlsx() {
 // ---- parse helpers -------------------------------------------------------
 
 function parseSettings(rows) {
-  /** @type {Record<string,string>} */
   const kv = {};
   for (const row of rows) {
     const key = norm(row[0]);
@@ -160,6 +159,7 @@ function parseSettings(rows) {
     author: kv['author'],
     language: kv['language'],
     dashboardHeading: kv['dashboard heading'] || kv['heading'],
+    allowPdfDownload: kv['allow pdf download'] !== undefined ? kv['allow pdf download'] : kv['pdf download'],
     navigation: (kv['navigation'] || '').toLowerCase(),
     reportSuccess: kv['report success'],
     courseId: kv['course id'],
@@ -172,22 +172,18 @@ function parseSections(rows, warnings) {
   const out = [];
   const header = (rows[0] || []).map(norm);
   const idx = colFinder(header, {
-    id: ['section id', 'id'],
-    title: ['title'],
-    required: ['required (yes/no)', 'required'],
-    order: ['order'],
+    id: ['section id', 'id'], title: ['title'],
+    required: ['required (yes/no)', 'required'], order: ['order'],
   });
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
     if (!row || row.every((c) => String(c).trim() === '')) continue;
-    const id = String(row[idx.id] ?? '').trim();
+    const id = cell(row, idx.id);
     if (!id) { warnings.push(`Sections row ${r + 1} skipped: missing Section ID.`); continue; }
     out.push({
-      id,
-      title: String(row[idx.title] ?? '').trim() || id,
-      required: toBool(row[idx.required]),
-      questions: [],
-      _order: parseInt(String(row[idx.order] ?? '0'), 10) || r,
+      id, title: cell(row, idx.title) || id,
+      required: toBool(cell(row, idx.required)), questions: [],
+      _order: parseInt(cell(row, idx.order) || '0', 10) || r,
     });
   }
   out.sort((a, b) => a._order - b._order);
@@ -199,14 +195,9 @@ function attachQuestions(sections, rows, warnings) {
   for (const s of sections) byId[s.id] = s;
   const header = (rows[0] || []).map(norm);
   const idx = colFinder(header, {
-    section: ['section id', 'section'],
-    type: ['type'],
-    prompt: ['prompt'],
-    required: ['required'],
-    options: ['options'],
-    scale: ['rating scale', 'scale'],
-    min: ['min', 'minimum'],
-    max: ['max', 'maximum'],
+    section: ['section id', 'section'], type: ['type'], prompt: ['prompt'],
+    required: ['required'], options: ['options'], scale: ['rating scale', 'scale'],
+    min: ['min', 'minimum'], max: ['max', 'maximum'],
     integer: ['whole numbers', 'integer only', 'whole numbers only'],
     help: ['help text', 'help'],
   });
@@ -214,27 +205,25 @@ function attachQuestions(sections, rows, warnings) {
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
     if (!row || row.every((c) => String(c).trim() === '')) continue;
-    const sectionId = String(row[idx.section] ?? '').trim();
+    const sectionId = cell(row, idx.section);
     const section = byId[sectionId];
     if (!section) { warnings.push(`Questions row ${r + 1} skipped: unknown Section ID "${sectionId}".`); continue; }
-    const type = String(row[idx.type] ?? '').trim();
-    const prompt = String(row[idx.prompt] ?? '').trim();
+    const type = cell(row, idx.type);
+    const prompt = cell(row, idx.prompt);
     if (!type || !prompt) { warnings.push(`Questions row ${r + 1} skipped: missing Type or Prompt.`); continue; }
 
     qn++;
     /** @type {any} */
-    const q = { id: `q_${sectionId}_${qn}`, type, prompt, required: toBool(row[idx.required]) };
+    const q = { id: `q_${sectionId}_${qn}`, type, prompt, required: toBool(cell(row, idx.required)) };
 
     const help = cell(row, idx.help);
     if (help) q.helpText = help;
 
-    // Options, with a leading * marking an expected option.
     const optionsRaw = cell(row, idx.options);
     if (optionsRaw) {
       q.options = optionsRaw.split('|').map((s) => s.trim()).filter(Boolean).map((label) => {
         const expected = label.startsWith('*');
         const clean = expected ? label.slice(1).trim() : label;
-        /** @type {any} */
         const opt = { id: newOptionId(), label: clean };
         if (expected) opt.expected = true;
         return opt;
@@ -266,14 +255,8 @@ function attachQuestions(sections, rows, warnings) {
   }
 }
 
-// ---- misc ----------------------------------------------------------------
-
-function cell(row, i) {
-  if (i === undefined || i < 0) return '';
-  return String(row[i] ?? '').trim();
-}
+function cell(row, i) { if (i === undefined || i < 0) return ''; return String(row[i] ?? '').trim(); }
 function colFinder(header, spec) {
-  /** @type {Record<string, number>} */
   const idx = {};
   for (const key of Object.keys(spec)) {
     idx[key] = -1;

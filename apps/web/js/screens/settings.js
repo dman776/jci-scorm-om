@@ -10,14 +10,9 @@ export function renderSettings(mount, { store }) {
     h('span.field-label', label),
     opts.textarea
       ? h('textarea', { rows: 3, value: get() || '', oninput: (e) => store.update(() => set(e.target.value)) })
-      : h('input', {
-          type: 'text', value: get() || '',
-          placeholder: opts.placeholder || '',
-          oninput: (e) => store.update(() => set(e.target.value)),
-        }),
+      : h('input', { type: 'text', value: get() || '', placeholder: opts.placeholder || '', oninput: (e) => store.update(() => set(e.target.value)) }),
     opts.hint ? h('span.field-hint', opts.hint) : null,
   ]);
-
   const selectField = (label, get, set, options) => h('label.field', [
     h('span.field-label', label),
     h('select', { onchange: (e) => store.update(() => set(e.target.value)) },
@@ -42,16 +37,19 @@ export function renderSettings(mount, { store }) {
     ]),
 
     h('div.card', [
-      h('h2.card-title', 'Learner-facing text'),
-      textField(
-        'Dashboard heading',
-        () => wb.settings.dashboardHeading,
-        (v) => (wb.settings.dashboardHeading = v),
-        {
-          placeholder: DEFAULT_HEADING,
-          hint: `Heading shown above the section list in the learner runtime. For example "Your Milestones" or "Your Observations". Leave blank to use "${DEFAULT_HEADING}".`,
-        }
-      ),
+      h('h2.card-title', 'Learner experience'),
+      textField('Dashboard heading', () => wb.settings.dashboardHeading, (v) => (wb.settings.dashboardHeading = v), {
+        placeholder: DEFAULT_HEADING,
+        hint: `Heading shown above the section list in the learner runtime, e.g. "Your Milestones". Leave blank to use "${DEFAULT_HEADING}".`,
+      }),
+      h('label.check-row', [
+        h('input', {
+          type: 'checkbox', checked: wb.settings.allowPdfDownload !== false,
+          onchange: (e) => store.update(() => { wb.settings.allowPdfDownload = e.target.checked; }),
+        }),
+        h('span', 'Allow learners to download a PDF of their responses'),
+      ]),
+      h('p.field-hint', 'Adds a button on each section that exports the learner\u2019s answers for the ENTIRE workbook as a PDF. The PDF never reveals which checklist options were marked Expected.'),
     ]),
 
     h('div.card', [

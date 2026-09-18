@@ -25,15 +25,36 @@ body {
 .sowb-header {
   position: sticky; top: 0; z-index: 5;
   background: var(--sowb-blue); color: #fff;
-  padding: 16px 20px; border-radius: 0 0 12px 12px;
-  display: flex; align-items: center; justify-content: space-between; gap: 24px;
+  padding: 14px 20px; border-radius: 0 0 12px 12px;
+  display: flex; align-items: center; justify-content: space-between;
+  gap: 16px; flex-wrap: wrap;
   margin-bottom: 24px;
 }
+.sowb-header-left { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.sowb-header-right { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.sowb-learner { font-size: 13px; opacity: .85; }
 .sowb-title { font-size: 18px; font-weight: 700; }
 .sowb-progress { display: flex; align-items: center; gap: 10px; min-width: 240px; }
 .sowb-progress-track { flex: 1; height: 10px; background: rgba(255,255,255,.25); border-radius: 6px; overflow: hidden; }
 .sowb-progress-fill { height: 100%; background: #4ade80; transition: width .25s ease; }
 .sowb-progress-label { font-size: 13px; white-space: nowrap; }
+
+.sowb-icon-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,.14); color: #fff;
+  border: 1px solid rgba(255,255,255,.35); border-radius: 8px;
+  padding: 8px 12px; min-height: 36px;
+  font-size: 13px; font-weight: 600; cursor: pointer;
+  line-height: 1;
+}
+.sowb-icon-btn:hover { background: rgba(255,255,255,.26); }
+.sowb-icon-btn:active { background: rgba(255,255,255,.34); }
+.sowb-icon-btn svg { display: block; }
+.sowb-icon-btn-text { letter-spacing: .3px; }
+.sowb-pdf-fallback { margin-top: 14px; font-size: 13px; }
+.sowb-pdf-note { color: var(--sowb-gray); }
+.sowb-pdf-link { color: var(--sowb-blue-2); }
+
 
 .sowb-h1 { font-size: 24px; margin: 8px 0 4px; }
 .sowb-desc { color: var(--sowb-gray); margin-top: 0; }
@@ -118,8 +139,9 @@ body {
 a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visible, label:focus-within {
   outline: 3px solid var(--sowb-focus); outline-offset: 2px;
 }
+
 @media (max-width: 640px) {
   .sowb-header { flex-direction: column; align-items: flex-start; gap: 10px; }
-  .sowb-progress { width: 100%; }
-  .sowb-section-card { flex-direction: column; align-items: flex-start; }
+  .sowb-header-right { width: 100%; justify-content: space-between; }
+  .sowb-progress { flex: 1; min-width: 160px; }
 }

@@ -24,6 +24,8 @@ export class SessionCore {
     this.adapter = opts.adapter;
     this.startTime = Date.now();
     this._exited = false;
+    /** Learner identity reported by the LMS, read once at init. */
+    this._learnerName = '';
     /** @type {import('@sowb/shared').LearnerState} */
     this.state = {
       currentSection: (this.workbook.sections[0] || {}).id || '',
@@ -35,6 +37,11 @@ export class SessionCore {
 
   init() {
     this.adapter.initialize();
+    // cmi.learner_name is read-only and supplied by the LMS. Capture it once
+    // at launch so the PDF report can identify the learner. It is never
+    // written to suspend data (the LMS already owns it).
+    this._learnerName = normalizeLearnerName(this.adapter.getValue('cmi.learner_name'));
+
     const entry = this.adapter.getValue('cmi.entry');
     if (entry === 'resume') {
       const restored = deserializeState(this.adapter.getValue('cmi.suspend_data'));
@@ -43,14 +50,21 @@ export class SessionCore {
       if (loc) this._applyLocation(loc);
     }
     this.state.sectionStatus = computeAllSectionStatus(this.workbook, this.state.responses);
-    return { entry, resumed: entry === 'resume' };
+    return { entry, resumed: entry === 'resume', learnerName: this._learnerName };
   }
+
+  /**
+   * The learner's display name from the LMS, or '' when unavailable (for
+   * example during standalone local preview with no LMS present).
+   */
+  learnerName() { return this._learnerName; }
 
   _applyLocation(loc) {
     const [sid, page] = String(loc).split(':');
     if (sid) this.state.currentSection = sid;
     if (page !== undefined) this.state.currentPage = parseInt(page, 10) || 0;
   }
+
   location() { return `${this.state.currentSection}:${this.state.currentPage}`; }
 
   /** Write full state to the LMS and Commit. Called after every page + change. */
@@ -75,17 +89,14 @@ export class SessionCore {
     return this.save();
   }
 
-  /** Question-level progress measure (partial responses do not count). */
-  progress() {
-    return computeProgressMeasure(this.workbook, this.state.sectionStatus, this.state.responses);
-  }
+  progress() { return computeProgressMeasure(this.workbook, this.state.sectionStatus, this.state.responses); }
   isComplete() { return isWorkbookComplete(this.workbook, this.state.sectionStatus); }
   isUnlocked(sectionId) { return isSectionUnlocked(this.workbook, sectionId, this.state.sectionStatus); }
   currentSection() {
     return this.workbook.sections.find((s) => s.id === this.state.currentSection) || this.workbook.sections[0];
   }
 
-    openSection(sectionId) {
+  openSection(sectionId) {
     if (!this.isUnlocked(sectionId)) return false;
     // Start at question 1 when opening a DIFFERENT section, or when reopening a
     // COMPLETED section (the learner is reviewing, so begin at the top).
@@ -98,12 +109,14 @@ export class SessionCore {
     this.save();
     return true;
   }
+
   nextPage() {
     const section = this.currentSection();
     if (this.state.currentPage < section.questions.length - 1) { this.state.currentPage++; this.save(); return true; }
     this.save();
     return false;
   }
+
   prevPage() {
     if (this.state.currentPage > 0) { this.state.currentPage--; this.save(); return true; }
     this.save();
@@ -122,6 +135,25 @@ export class SessionCore {
   }
 
   suspendBytes() { return estimateSuspendSize(this.state); }
+}
+
+/**
+ * LMSs commonly report cmi.learner_name in "Last, First" form. Flip it to
+ * "First Last" for a natural reading in the report heading, and trim noise.
+ * Anything that does not look like a simple "Last, First" pair is left as-is.
+ * @param {string} raw
+ * @returns {string}
+ */
+export function normalizeLearnerName(raw) {
+  const name = String(raw == null ? '' : raw).trim().replace(/\s+/g, ' ');
+  if (!name) return '';
+  const parts = name.split(',');
+  if (parts.length === 2) {
+    const last = parts[0].trim();
+    const first = parts[1].trim();
+    if (last && first) return `${first} ${last}`;
+  }
+  return name;
 }
 
 /** Milliseconds to ISO 8601 duration (PTnHnMnS). */
