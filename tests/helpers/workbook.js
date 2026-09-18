@@ -78,8 +78,8 @@ export const COMPLETE_REQUIRED_RESPONSES = Object.freeze({
   q_s1_3: ['o_scope', 'o_safety'],   // both expected options
   q_s2_1: 'Dana Ruiz',
   q_s2_2: '6',                       // >= min 4, whole number
-  q_s2_3: '2',                       // agreement-5 -> Agree
-  q_s2_4: '1',                       // frequency-5 -> Always
+  q_s2_3: '2',                       // agreement-5 -> Disagree
+  q_s2_4: '1',                       // frequency-5 -> Never
   q_s3_1: 'yes',
   q_s3_2: '4',                       // numeric-5
 });

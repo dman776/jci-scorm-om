@@ -23,7 +23,7 @@ const MIXED_STATE = {
     q_s1_3: ['o_scope'],            // partial: missing an expected option
     q_s2_1: 'Dana Ruiz',
     q_s2_2: '2',                    // partial: below min
-    q_s2_3: '2',                    // Agree
+    q_s2_3: '4',                    // Agree
     q_s3_2: '4',                    // unlabeled numeric
   },
 };
@@ -186,10 +186,10 @@ test('PRIVACY: the report never reveals which options were expected', async () =
 
 test('rating answers render with their scale wording', async () => {
   const s = latin(buildResponseReport(await runtimeWorkbook(), MIXED_STATE, {}));
-  // NOTE: parentheses delimit PDF strings, so "Agree (2)" is stored escaped as
-  // "Agree \(2\)". Asserting on the escaped form also proves escapeText ran.
-  assert.ok(s.includes('Agree \\(2\\)'), 'labeled scale shows wording and value');
-  assert.ok(!s.includes('Agree (2)'), 'the raw parens must be escaped, or the PDF is malformed');
+  // NOTE: parentheses delimit PDF strings, so "Agree (4)" is stored escaped as
+  // "Agree \(4\)". Asserting on the escaped form also proves escapeText ran.
+  assert.ok(s.includes('Agree \\(4\\)'), 'labeled scale shows wording and value');
+  assert.ok(!s.includes('Agree (4)'), 'the raw parens must be escaped, or the PDF is malformed');
   // An unlabeled numeric scale must not read "4 (4)".
   assert.ok(!s.includes('4 \\(4\\)'));
 });

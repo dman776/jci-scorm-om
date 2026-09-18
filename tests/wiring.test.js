@@ -100,9 +100,9 @@ test('the stored value is the scale value, never the label', async () => {
   const wb = inlineScales(await loadWorkbook(), []);
   const { player, mount } = renderPlayer(wb);
   const radios = mount.querySelectorAll('[data-q="q1"]');
-  assert.deepEqual(radios.map((r) => r.value), ['1', '2', '3', '4', '5']);
+  assert.deepEqual(radios.map((r) => r.value), ['5', '4', '3', '2', '1']);
   radios[1].dispatch('change');
-  assert.equal(player.state.responses.q1, '2', 'stores the value');
+  assert.equal(player.state.responses.q1, '4', 'stores the value');
 });
 
 test('a scaleId with no inline points still renders after publish', async () => {

@@ -33,9 +33,11 @@ test('ships the built-in scales the request called for', () => {
     ['Always', 'Almost Always', 'Sometimes', 'Rarely', 'Never']
   );
   assert.deepEqual(byId['numeric-5'].points.map((p) => p.label), ['1', '2', '3', '4', '5']);
-  // All three are 1..5 so results can be compared across questions.
-  for (const id of ['agreement-5', 'frequency-5', 'numeric-5']) {
-    assert.deepEqual(byId[id].points.map((p) => p.value), [1, 2, 3, 4, 5], `${id} values are 1..5`);
+  // All three range 1..5 so results can be compared across questions. For
+  // agreement and frequency, higher is more positive: 5 = Strongly Agree / Always.
+  assert.deepEqual(byId['numeric-5'].points.map((p) => p.value), [1, 2, 3, 4, 5], 'numeric-5 values are 1..5');
+  for (const id of ['agreement-5', 'frequency-5']) {
+    assert.deepEqual(byId[id].points.map((p) => p.value), [5, 4, 3, 2, 1], `${id} values are 5..1`);
   }
 });
 
@@ -114,8 +116,8 @@ test('a custom one-off scale is left alone by inlining', async () => {
 
 test('formats a rating answer with its label for the report', () => {
   const index = buildScaleIndex();
-  assert.equal(formatScaleAnswer(index['agreement-5'].points, '2'), 'Agree (2)');
-  assert.equal(formatScaleAnswer(index['frequency-5'].points, '4'), 'Rarely (4)');
+  assert.equal(formatScaleAnswer(index['agreement-5'].points, '4'), 'Agree (4)');
+  assert.equal(formatScaleAnswer(index['frequency-5'].points, '2'), 'Rarely (2)');
   // Unlabeled numeric scales must not read "3 (3)".
   assert.equal(formatScaleAnswer(index['numeric-5'].points, '3'), '3');
   // Nor should Low/Medium/High, where the label IS the value.

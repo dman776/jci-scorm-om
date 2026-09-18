@@ -61,11 +61,11 @@ export const BUILT_IN_SCALES = Object.freeze([
     description: 'Strongly Agree through Strongly Disagree.',
     builtIn: true,
     points: [
-      { value: 1, label: 'Strongly Agree' },
-      { value: 2, label: 'Agree' },
+      { value: 5, label: 'Strongly Agree' },
+      { value: 4, label: 'Agree' },
       { value: 3, label: 'Neutral' },
-      { value: 4, label: 'Disagree' },
-      { value: 5, label: 'Strongly Disagree' },
+      { value: 2, label: 'Disagree' },
+      { value: 1, label: 'Strongly Disagree' },
     ],
   },
   {
@@ -74,11 +74,11 @@ export const BUILT_IN_SCALES = Object.freeze([
     description: 'Always through Never.',
     builtIn: true,
     points: [
-      { value: 1, label: 'Always' },
-      { value: 2, label: 'Almost Always' },
+      { value: 5, label: 'Always' },
+      { value: 4, label: 'Almost Always' },
       { value: 3, label: 'Sometimes' },
-      { value: 4, label: 'Rarely' },
-      { value: 5, label: 'Never' },
+      { value: 2, label: 'Rarely' },
+      { value: 1, label: 'Never' },
     ],
   },
   {
