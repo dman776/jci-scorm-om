@@ -211,7 +211,7 @@ async function readBodyJson(req) {
 }
 
 server.listen(PORT, HOST, () => {
-  console.log(`\nSCORM Observation Workbook Builder`);
+  console.log(`\nSOWB-It · SCORM Observation Workbook Builder Internal Tool`);
   console.log(`  Authoring app:  http://${HOST}:${PORT}/`);
   console.log(`  Press Ctrl+C to stop.\n`);
 });

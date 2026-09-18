@@ -47,7 +47,7 @@ export async function renderPublish(mount, { store, api }) {
 
   const buildCard = h('div.card', [
     h('h2.card-title', '3. Build package'),
-    h('p', 'The ZIP contains index.html and imsmanifest.xml at the root and can be uploaded directly to Workday Learning.'),
+    h('p', 'The ZIP contains index.html and imsmanifest.xml at the root and can be uploaded directly to any SCORM 2004 4th Edition compliant LMS.'),
     h('div.publish-actions', [
       h('button.btn.big' + (report.ok ? '' : '.disabled'), { disabled: !report.ok, onclick: onBuildZip }, 'Build SCORM ZIP'),
     ]),

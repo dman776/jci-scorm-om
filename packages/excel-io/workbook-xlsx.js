@@ -128,7 +128,7 @@ export function formatScaleCell(question) {
 /** Build template.xlsx with a valid mini example workbook that round-trips. */
 export async function buildTemplateXlsx() {
   const instructions = [
-    ['SCORM Observation Workbook Builder - Excel Import Template'],
+    ['SOWB-It - Excel Import Template'],
     [''],
     ['Fill in the Settings, Sections, and Questions sheets, then import this file from the authoring app.'],
     [''],

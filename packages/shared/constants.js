@@ -60,5 +60,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   allowPdfDownload: true,
 });
 
-export const APP_NAME = 'SCORM Observation Workbook Builder';
+export const APP_NAME = 'SOWB-It';
+/** What the name stands for, used wherever the tool introduces itself. */
+export const APP_FULL_NAME = 'SCORM Observation Workbook Builder Internal Tool';
 export const SCORM_VERSION = '2004 4th Edition';

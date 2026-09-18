@@ -7,7 +7,7 @@ export function renderHelp(mount) {
     h('p.screen-sub', 'Everything you need to author, preview, publish, and upload an observation workbook.'),
 
     section('What this tool does', [
-      p('The SCORM Observation Workbook Builder turns ride-alongs, shadowing sessions, install-team meetings, and field observations into a digital workbook that a learner completes progressively over days or weeks. It exports a self-contained SCORM 2004 4th Edition package you upload to Workday Learning.'),
+      p('SOWB-It (the SCORM Observation Workbook Builder Internal Tool) turns ride-alongs, shadowing sessions, install-team meetings, and field observations into a digital workbook that a learner completes progressively over days or weeks. It exports a self-contained package you upload to any SCORM 2004 4th Edition compliant LMS.'),
       p('Learners can exit at any time and resume where they left off. On resume they always return to the section list and choose which section to continue. Their responses auto-save to the LMS after every page and every change.'),
     ]),
 
@@ -25,7 +25,7 @@ export function renderHelp(mount) {
         ['Partially Complete', 'Nothing is blank, but at least one required question does not meet its requirement.'],
         ['Completed', 'Every required question is complete.'],
       ]),
-      p('Note: SCORM 2004 has no "partial" completion value, so a partially complete section still reports the workbook as incomplete to Workday Learning. The distinction is shown on the learner dashboard and reflected in the progress measure.'),
+      p('Note: SCORM 2004 has no "partial" completion value, so a partially complete section still reports the workbook as incomplete to the LMS. The distinction is shown on the learner dashboard and reflected in the progress measure.'),
     ]),
 
     section('Question types', [
@@ -61,7 +61,7 @@ export function renderHelp(mount) {
       p('When enabled, the runtime header shows a PDF button on the section list. Wherever the learner is, the PDF contains the ENTIRE workbook: every section with its status, every question, and their answers, plus overall progress and their name from the LMS.'),
       p('Unanswered questions appear as "Not answered", and partial answers carry the same neutral requirement hint the runtime shows. The PDF is generated entirely inside the SCO with no server call, so it works offline in the LMS.'),
       p('Turn it off per workbook on Workbook Settings, or with the "Allow PDF Download" key in the Excel Settings sheet. It defaults to on.'),
-      p('If your LMS hosts the course in a sandboxed frame that blocks downloads, the browser may silently ignore the download. The runtime always shows a fallback link ("Open the PDF in a new tab") so learners can still save it. Test this in your Workday Learning sandbox before wide release.'),
+      p('If your LMS hosts the course in a sandboxed frame that blocks downloads, the browser may silently ignore the download. The runtime always shows a fallback link ("Open the PDF in a new tab") so learners can still save it. Test this in your own LMS sandbox before wide release.'),
     ]),
 
     section('Section titles', [
@@ -74,11 +74,12 @@ export function renderHelp(mount) {
       p('In the Questions sheet, prefix an option with an asterisk to mark it expected, for example "Scope review | *Safety plan". The Rating Scale column accepts a scale id, a scale name, explicit points like "1=Strongly Agree | 2=Agree", bare labels, or 1-5. Use Min, Max, and Whole Numbers for numeric questions. Columns are matched by header name, so older templates still import cleanly.'),
     ]),
 
-    section('Publishing and uploading to Workday Learning', [
+    section('Publishing and uploading to your LMS', [
+      p('The package targets any SCORM 2004 4th Edition compliant LMS.'),
       ol([
         'On the Publish screen, resolve any blocking errors (warnings are advisory).',
         'Select "Build SCORM ZIP" to download the package (index.html and imsmanifest.xml sit at the ZIP root).',
-        'In Workday Learning, create a lesson and upload the ZIP as SCORM 2004 content.',
+        'In your LMS, create a lesson and upload the ZIP as SCORM 2004 content.',
         'Set the lesson to track completion. The workbook reports completed / incomplete and a progress measure automatically.',
         'Recommended: validate the package with the ADL SCORM 2004 4th Edition Test Suite, and confirm the PDF download works, before wide release.',
       ]),

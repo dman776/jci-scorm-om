@@ -42,8 +42,8 @@ function renderShell() {
 function renderTopbar() {
   return h('header.topbar', [
     h('div.brand', [
-      h('span.brand-mark', { text: 'SOWB' }),
-      h('span.brand-name', { text: 'SCORM Observation Workbook Builder' }),
+      h('span.brand-mark', { text: 'SOWB-It' }),
+      h('span.brand-name', { text: 'SCORM Observation Workbook Builder Internal Tool' }),
     ]),
     h('div.top-actions', [
       h('span.wb-title-chip', [store.workbook.title, store.dirty ? h('span.dirty-dot', { title: 'Unsaved changes' }) : null]),
