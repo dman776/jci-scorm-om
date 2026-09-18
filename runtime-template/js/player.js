@@ -78,7 +78,9 @@ export class WorkbookPlayer {
 
   // ---- navigation --------------------------------------------------------
 
-  goToDashboard() { this.view = 'dashboard'; this.session.save(); this.render(); }
+  // Every route out of a section funnels through here, so this is the single
+  // place an opt-in section lock commits.
+  goToDashboard() { this.view = 'dashboard'; this.session.closeSection(); this.render(); }
   openSection(id) { if (this.session.openSection(id)) { this.view = 'section'; this.render(); } }
   nextPage() { if (this.session.nextPage()) this.render(); else this.goToDashboard(); }
   prevPage() { if (this.session.prevPage()) this.render(); else this.goToDashboard(); }
@@ -278,6 +280,7 @@ export class WorkbookPlayer {
     this.workbook.sections.forEach((section) => {
       const status = this.state.sectionStatus[section.id] || NOT_STARTED;
       const unlocked = this.session.isUnlocked(section.id);
+      const answersLocked = this.session.isLocked(section.id);
       const li = el('li', 'sowb-section-card status-' + status + (unlocked ? '' : ' locked'));
 
       const meta = el('div', 'sowb-section-meta');
@@ -293,6 +296,12 @@ export class WorkbookPlayer {
       if (status === PARTIALLY_COMPLETE) {
         const note = el('div', 'sowb-section-note');
         note.textContent = 'Every item has a response, but some requirements are not yet met.';
+        meta.appendChild(note);
+      }
+      if (answersLocked) {
+        const note = el('div', 'sowb-section-lock');
+        note.setAttribute('data-section-locked', section.id);
+        note.textContent = 'Answers locked · you can still review this section.';
         meta.appendChild(note);
       }
 
@@ -360,7 +369,16 @@ export class WorkbookPlayer {
     counter.textContent = `Question ${page + 1} of ${total}`;
     wrap.appendChild(counter);
 
-    wrap.appendChild(this._renderQuestion(question));
+    const locked = this.session.isLocked(section.id);
+    if (locked) {
+      const banner = el('div', 'sowb-locked-banner');
+      banner.setAttribute('data-locked-banner', '');
+      banner.setAttribute('role', 'status');
+      banner.textContent = 'You finished this section, so your answers are now final. You can still read back everything you recorded.';
+      wrap.appendChild(banner);
+    }
+
+    wrap.appendChild(this._renderQuestion(question, locked));
 
     const nav = el('div', 'sowb-nav');
     const prev = el('button', 'sowb-btn ghost');
@@ -379,8 +397,8 @@ export class WorkbookPlayer {
     return wrap;
   }
 
-  _renderQuestion(q) {
-    const card = el('div', 'sowb-question');
+  _renderQuestion(q, locked) {
+    const card = el('div', 'sowb-question' + (locked ? ' locked' : ''));
     const prompt = el('label', 'sowb-prompt');
     prompt.id = 'lbl-' + q.id;
     prompt.textContent = q.prompt;
@@ -398,7 +416,7 @@ export class WorkbookPlayer {
       card.appendChild(help);
     }
 
-    card.appendChild(this._renderInput(q, this.state.responses[q.id]));
+    card.appendChild(this._renderInput(q, this.state.responses[q.id], locked));
 
     const info = this._answerStatus(q);
     const status = el('div', 'sowb-answer-status ' + info.cls);
@@ -409,7 +427,7 @@ export class WorkbookPlayer {
     return card;
   }
 
-  _renderInput(q, value) {
+  _renderInput(q, value, locked) {
     const box = el('div', 'sowb-input');
     const lb = 'lbl-' + q.id;
     switch (q.type) {
@@ -509,6 +527,7 @@ export class WorkbookPlayer {
         box.appendChild(p);
       }
     }
+    if (locked) disableControls(box);
     return box;
   }
 
@@ -624,6 +643,17 @@ function el(tag, cls) {
   const node = document.createElement(tag);
   if (cls) node.className = cls;
   return node;
+}
+
+/**
+ * Make every control in a rendered answer read-only. Done by walking the built
+ * subtree rather than at each of the dozen input branches, so a new question
+ * type cannot be added that silently stays editable once locked.
+ */
+function disableControls(box) {
+  for (const sel of ['input', 'textarea', 'select']) {
+    for (const node of box.querySelectorAll(sel)) node.disabled = true;
+  }
 }
 function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
 function isNum(v) { return v !== undefined && v !== null && v !== '' && isFinite(Number(v)); }

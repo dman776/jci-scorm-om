@@ -83,17 +83,29 @@ function renderCenter(wb, store, rerender) {
     ])]);
   }
   return h('div.editor-center', [
-    h('div.card', [h('div.section-head', [
-      h('label.field.grow', [
-        h('span.field-label', 'Section title'),
-        h('input', { type: 'text', value: section.title, oninput: (e) => store.update(() => { section.title = e.target.value; }) }),
-        h('span.field-hint', 'Shown verbatim to the learner, e.g. "Month 1". No "Section N:" prefix is added.'),
+    h('div.card', [
+      h('div.section-head', [
+        h('label.field.grow', [
+          h('span.field-label', 'Section title'),
+          h('input', { type: 'text', value: section.title, oninput: (e) => store.update(() => { section.title = e.target.value; }) }),
+          h('span.field-hint', 'Shown verbatim to the learner, e.g. "Month 1". No "Section N:" prefix is added.'),
+        ]),
+        h('label.check-row.nowrap', [
+          h('input', { type: 'checkbox', checked: section.required, onchange: (e) => store.update(() => { section.required = e.target.checked; }) }),
+          h('span', 'Required (gates completion)'),
+        ]),
+        h('label.check-row.nowrap', {
+          title: 'A locked section can still be reopened and read; only its answers are frozen.',
+        }, [
+          h('input', {
+            type: 'checkbox', checked: !!section.lockWhenComplete,
+            onchange: (e) => { store.update(() => { section.lockWhenComplete = e.target.checked; }); rerender(); },
+          }),
+          h('span', 'Lock answers when complete'),
+        ]),
       ]),
-      h('label.check-row.nowrap', [
-        h('input', { type: 'checkbox', checked: section.required, onchange: (e) => store.update(() => { section.required = e.target.checked; }) }),
-        h('span', 'Required (gates completion)'),
-      ]),
-    ])]),
+      section.lockWhenComplete ? h('p.block-hint', lockHint(section)) : null,
+    ]),
     h('div.q-list', section.questions.map((q, qi) => renderQuestionCard(section, q, qi, store, rerender))),
     h('div.add-q-bar', [
       h('span.add-q-label', 'Add question:'),
@@ -205,6 +217,15 @@ function renderUrlNote() {
     h('span.field-label', 'Link rule'),
     h('p.block-hint', 'The learner must enter a valid http:// or https:// link. Anything else counts as a partial response and does not complete the question. Valid links render as a clickable preview.'),
   ]);
+}
+
+/** States exactly when the lock bites, including the no-required-questions trap. */
+function lockHint(section) {
+  const required = (section.questions || []).filter((q) => q.required).length;
+  if (required === 0) {
+    return 'Careful: this section has no required questions, so it completes on the learner’s very first answer and locks as soon as they leave, with every other item still blank.';
+  }
+  return `The learner edits freely while inside this section. It locks when they leave it with all ${required} required question${required === 1 ? '' : 's'} complete, and cannot be reopened for editing.`;
 }
 
 function previewRule(q) {

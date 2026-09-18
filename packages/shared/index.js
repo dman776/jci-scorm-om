@@ -39,6 +39,7 @@
  * @property {string} id
  * @property {string} title
  * @property {boolean} required
+ * @property {boolean} [lockWhenComplete] Freeze this section's answers once the learner completes and leaves it.
  * @property {Question[]} questions
  */
 
@@ -61,6 +62,7 @@
  * @property {number} currentPage
  * @property {Record<string, any>} responses
  * @property {Record<string, string>} sectionStatus
+ * @property {string[]} [lockedSections] Ids of sections whose answers the learner has finalized.
  */
 
 export * from './constants.js';

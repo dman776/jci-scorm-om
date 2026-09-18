@@ -136,7 +136,11 @@ export async function buildTemplateXlsx() {
     ['  Dashboard Heading    The learner-facing heading on the section list, e.g. "Your Milestones".'],
     ['  Allow PDF Download   yes or no. Shows learners a button to download a PDF of their responses.'],
     ['                       Defaults to yes when the key is absent.'],
-    ['SECTIONS sheet: one row per section. Columns: Section ID, Title, Required (yes/no), Order.'],
+    ['SECTIONS sheet: one row per section. Columns: Section ID, Title, Required (yes/no), Order,'],
+    ['                Lock When Complete (yes/no).'],
+    ['  Lock When Complete   yes freezes the section once the learner completes it AND leaves it.'],
+    ['                       They can still reopen and read it, but answers can no longer change,'],
+    ['                       and nothing in the SCO can unlock it. Defaults to no.'],
     ['QUESTIONS sheet: one row per question. Columns below.'],
     [''],
     ['Question columns:'],
@@ -171,6 +175,7 @@ export async function buildTemplateXlsx() {
     ['  - A section is COMPLETED only when every REQUIRED question in it is COMPLETE.'],
     ['  - A section where nothing is blank but a requirement is unmet shows as PARTIALLY COMPLETE.'],
     ['  - The workbook reports "completed" only when every REQUIRED section is complete.'],
+    ['  - A section with Lock When Complete freezes its answers once the learner completes it and leaves it.'],
     ['  - evidence_ref records file metadata only; it never stores a file inside SCORM.'],
   ];
 
@@ -191,10 +196,10 @@ export async function buildTemplateXlsx() {
   ];
 
   const sections = [
-    ['Section ID', 'Title', 'Required (yes/no)', 'Order'],
-    ['s1', 'Month 1', 'yes', '1'],
-    ['s2', 'Month 2', 'yes', '2'],
-    ['s3', 'Month 3', 'yes', '3'],
+    ['Section ID', 'Title', 'Required (yes/no)', 'Order', 'Lock When Complete (yes/no)'],
+    ['s1', 'Month 1', 'yes', '1', 'no'],
+    ['s2', 'Month 2', 'yes', '2', 'no'],
+    ['s3', 'Month 3', 'yes', '3', 'no'],
   ];
 
   const questions = [
@@ -251,17 +256,23 @@ function parseSections(rows, warnings) {
   const idx = colFinder(header, {
     id: ['section id', 'id'], title: ['title'],
     required: ['required (yes/no)', 'required'], order: ['order'],
+    lock: ['lock when complete (yes/no)', 'lock when complete', 'lock answers'],
   });
   for (let r = 1; r < rows.length; r++) {
     const row = rows[r];
     if (!row || row.every((c) => String(c).trim() === '')) continue;
     const id = cell(row, idx.id);
     if (!id) { warnings.push(`Sections row ${r + 1} skipped: missing Section ID.`); continue; }
-    out.push({
+    /** @type {any} */
+    const section = {
       id, title: cell(row, idx.title) || id,
       required: toBool(cell(row, idx.required)), questions: [],
       _order: parseInt(cell(row, idx.order) || '0', 10) || r,
-    });
+    };
+    // Absent column (an older template) means no locking, so only set the flag
+    // when the author actually asked for it.
+    if (toBool(cell(row, idx.lock))) section.lockWhenComplete = true;
+    out.push(section);
   }
   out.sort((a, b) => a._order - b._order);
   return out;

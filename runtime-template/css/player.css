@@ -72,6 +72,7 @@ body {
 .sowb-section-name { font-weight: 600; }
 .sowb-section-sub { color: var(--sowb-gray); font-size: 13px; }
 .sowb-section-note { color: var(--sowb-orange); font-size: 13px; margin-top: 4px; }
+.sowb-section-lock { color: var(--sowb-gray); font-size: 13px; font-weight: 600; margin-top: 4px; }
 .sowb-section-right { display: flex; align-items: center; gap: 14px; }
 
 .sowb-pill { font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
@@ -99,7 +100,15 @@ body {
 /* ---- question view ---- */
 .sowb-back { background: none; border: none; color: var(--sowb-blue-2); cursor: pointer; font-size: 14px; padding: 0; margin-bottom: 8px; }
 .sowb-counter { color: var(--sowb-gray); font-size: 13px; margin-bottom: 12px; }
+.sowb-locked-banner {
+  margin-bottom: 14px; padding: 12px 14px; font-size: 14px;
+  background: #eef1f6; border: 1px solid var(--sowb-border); border-left: 4px solid var(--sowb-gray);
+  border-radius: 8px;
+}
 .sowb-question { background: var(--sowb-card); border: 1px solid var(--sowb-border); border-radius: 10px; padding: 20px; }
+/* Locked answers stay fully legible; only the controls read as inert. */
+.sowb-question.locked input, .sowb-question.locked textarea, .sowb-question.locked select { cursor: not-allowed; }
+.sowb-question.locked .sowb-choice, .sowb-question.locked .sowb-rating-row, .sowb-question.locked .sowb-rating-item { cursor: not-allowed; }
 .sowb-prompt { font-size: 17px; font-weight: 600; display: block; }
 .sowb-req { color: #c0392b; }
 .sowb-help { color: var(--sowb-gray); font-size: 14px; margin: 6px 0 14px; }

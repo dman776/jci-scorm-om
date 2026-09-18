@@ -57,6 +57,15 @@ export function validateWorkbook(workbook, opts = {}) {
         ref: section.id,
       });
     }
+    // Locking plus no required questions strands the learner: the section
+    // completes on their first answer, then freezes with the rest still blank.
+    if (section.lockWhenComplete && questions.length > 0 && !questions.some((q) => q.required)) {
+      warnings.push({
+        code: 'lock-no-required-questions',
+        message: `Section "${section.title || section.id}" locks when complete but has no required questions, so it locks as soon as the learner answers anything and leaves, with the other items still blank.`,
+        ref: section.id,
+      });
+    }
 
     for (const q of questions) {
       if (seenQuestionIds.has(q.id)) {

@@ -8,7 +8,7 @@
  *
  * Runs in the browser player and in Node tests, so it stays dependency-free.
  */
-export const SUSPEND_FORMAT_VERSION = 2;
+export const SUSPEND_FORMAT_VERSION = 3;
 
 export function serializeState(state) {
   return JSON.stringify({
@@ -17,11 +17,12 @@ export function serializeState(state) {
     cp: typeof state.currentPage === 'number' ? state.currentPage : 0,
     r: state.responses || {},
     ss: encodeStatusMap(state.sectionStatus || {}),
+    l: state.lockedSections || [],
   });
 }
 
 export function deserializeState(raw) {
-  const empty = { currentSection: '', currentPage: 0, responses: {}, sectionStatus: {} };
+  const empty = { currentSection: '', currentPage: 0, responses: {}, sectionStatus: {}, lockedSections: [] };
   if (!raw || typeof raw !== 'string') return empty;
   let data;
   try { data = JSON.parse(raw); } catch { return empty; }
@@ -31,6 +32,8 @@ export function deserializeState(raw) {
     currentPage: typeof data.cp === 'number' ? data.cp : 0,
     responses: data.r || {},
     sectionStatus: decodeStatusMap(data.ss || {}),
+    // v2 payloads predate answer locking and carry no `l`; they resume unlocked.
+    lockedSections: Array.isArray(data.l) ? data.l : [],
   };
 }
 

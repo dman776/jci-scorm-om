@@ -10,7 +10,7 @@
  */
 import {
   computeAllSectionStatus, computeProgressMeasure,
-  isWorkbookComplete, isSectionUnlocked, COMPLETED,
+  isWorkbookComplete, isSectionUnlocked, isSectionLocked, shouldLockSection, COMPLETED,
 } from './engine/completion.js';
 import { serializeState, deserializeState, estimateSuspendSize } from './engine/suspend.js';
 
@@ -28,7 +28,13 @@ export class SessionCore {
       currentPage: 0,
       responses: {},
       sectionStatus: {},
+      lockedSections: [],
     };
+    /** questionId -> sectionId, so a write can find the section that governs it. */
+    this._sectionOfQuestion = {};
+    for (const section of this.workbook.sections || []) {
+      for (const question of section.questions || []) this._sectionOfQuestion[question.id] = section.id;
+    }
   }
 
   init() {
@@ -76,7 +82,15 @@ export class SessionCore {
     return { bytes: estimateSuspendSize(this.state), complete };
   }
 
+  /**
+   * Record a response, unless its section's answers are already final. The
+   * rejection here is the real guarantee; disabling the inputs in the player is
+   * only the visible half of it.
+   */
   setResponse(questionId, value) {
+    if (this.isQuestionLocked(questionId)) {
+      return { bytes: this.suspendBytes(), complete: this.isComplete(), locked: true };
+    }
     this.state.responses[questionId] = value;
     return this.save();
   }
@@ -88,9 +102,38 @@ export class SessionCore {
   currentSection() {
     return this.workbook.sections.find((s) => s.id === this.state.currentSection) || this.workbook.sections[0];
   }
+  _section(sectionId) { return this.workbook.sections.find((s) => s.id === sectionId); }
+
+  /**
+   * Are this section's answers final? Distinct from isUnlocked(), which is the
+   * linear-navigation gate on whether the section can be OPENED at all. A
+   * locked section is still fully readable; only its answers are frozen.
+   */
+  isLocked(sectionId) {
+    return isSectionLocked(this._section(sectionId), this.state.sectionStatus[sectionId], this.state.lockedSections);
+  }
+  isQuestionLocked(questionId) { return this.isLocked(this._sectionOfQuestion[questionId]); }
+
+  /**
+   * Leave the current section. This is where an opt-in lock commits, so the
+   * learner can still fix the answer that completed the section right up until
+   * they step out of it.
+   */
+  closeSection() {
+    this._commitLock(this.state.currentSection);
+    return this.save();
+  }
+
+  _commitLock(sectionId) {
+    if (!shouldLockSection(this._section(sectionId), this.state.sectionStatus[sectionId])) return false;
+    if (!this.state.lockedSections.includes(sectionId)) this.state.lockedSections.push(sectionId);
+    return true;
+  }
 
   openSection(sectionId) {
     if (!this.isUnlocked(sectionId)) return false;
+    // Moving straight from one section to another still counts as leaving.
+    if (sectionId !== this.state.currentSection) this._commitLock(this.state.currentSection);
     // Start at question 1 when opening a DIFFERENT section, or when reopening a
     // COMPLETED section (the learner is reviewing, so begin at the top).
     // Otherwise resume at the saved page so "Continue" lands in place.
@@ -117,6 +160,9 @@ export class SessionCore {
   suspendAndExit() {
     if (this._exited) return;
     this._exited = true;
+    // Exiting from inside a completed section is leaving it, so the lock
+    // commits here too and the learner resumes to the same state they left.
+    this._commitLock(this.state.currentSection);
     this.save();
     this.adapter.setValue('cmi.exit', 'suspend');
     this.adapter.setValue('cmi.session_time', toIsoDuration(Date.now() - this.startTime));

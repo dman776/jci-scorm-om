@@ -223,6 +223,38 @@ export function isSectionUnlocked(workbook, sectionId, sectionStatus) {
   return true;
 }
 
+/**
+ * ANSWER LOCKING (opt-in per section via `lockWhenComplete`)
+ *
+ * Locking is committed state, not a pure function of status, which is why the
+ * runtime records locked section ids in learner state and these are two
+ * functions rather than one. A section the learner is still inside stays
+ * editable even once every requirement is satisfied: a long_text answer counts
+ * as complete on its FIRST character, so locking on status alone would freeze
+ * the section mid-sentence. The runtime commits the lock when the learner
+ * leaves the section instead.
+ */
+
+/** Does leaving this section right now commit its lock? */
+export function shouldLockSection(section, status) {
+  return !!(section && section.lockWhenComplete) && status === COMPLETED;
+}
+
+/**
+ * Are this section's answers final?
+ *
+ * Deliberately re-checks the current flag and status rather than trusting the
+ * committed id alone. If the author republishes with an extra required
+ * question, a locked section drops out of COMPLETED and must become editable
+ * again, or the learner is stranded in a workbook that can never complete. A
+ * learner can never reach that state on their own, because locked answers
+ * cannot change and so the status cannot fall.
+ */
+export function isSectionLocked(section, status, lockedSections) {
+  if (!shouldLockSection(section, status)) return false;
+  return (lockedSections || []).includes(section.id);
+}
+
 /** Structural URL check only. Never performs a network call (the SCO is offline). */
 export function isValidHttpUrl(value) {
   const raw = String(value || '').trim();
