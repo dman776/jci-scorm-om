@@ -3,6 +3,10 @@
   "version": "1.4.0",
   "type": "module",
   "main": "index.js",
-  "exports": { ".": "./index.js", "./workbook-xlsx.js": "./workbook-xlsx.js" },
+  "exports": {
+    ".": "./index.js",
+    "./workbook-xlsx.js": "./workbook-xlsx.js",
+    "./scale-column.js": "./scale-column.js"
+  },
   "dependencies": { "jszip": "3.10.1" }
 }
