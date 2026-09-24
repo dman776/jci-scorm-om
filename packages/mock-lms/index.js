@@ -6,7 +6,8 @@
  *
  * cmi.interactions follows the spec's array rules strictly, so a SCO that
  * skips an index (351) or writes a field before its id (408) fails here the
- * way it would in a real LMS.
+ * way it would in a real LMS. Timestamps and results are type-checked (406),
+ * since strict LMSs silently drop a malformed value.
  *
  * Usage:
  *   const lms = new MockLMS();
@@ -76,7 +77,7 @@ export class MockLMS {
       SetValue(el, v) {
         if (!initialized) { lastError = '132'; return 'false'; }
         if (READ_ONLY.has(el) || COUNT_RE.test(el)) { lastError = '404'; return 'false'; }
-        const err = arrayOrderError(session, el);
+        const err = arrayOrderError(session, el) || formatError(el, String(v));
         if (err) { lastError = err; return 'false'; }
         session[el] = String(v); lastError = '0'; return 'true';
       },
@@ -121,6 +122,17 @@ function countEntries(data, base) {
   return n;
 }
 
+/** SCORM time(second,10,0): a time zone is only allowed after fractional seconds. */
+const SCORM_TIME = /^\d{4}(-\d{2}(-\d{2}(T\d{2}(:\d{2}(:\d{2}(\.\d{1,2}(Z|[+-]\d{2}(:\d{2})?)?)?)?)?)?)?)?$/;
+const RESULTS = new Set(['correct', 'incorrect', 'unanticipated', 'neutral']);
+
+/** @returns {string} '406' (type mismatch) for a malformed value, else '' */
+function formatError(el, v) {
+  if (/^cmi\.interactions\.\d+\.timestamp$/.test(el) && !SCORM_TIME.test(v)) return '406';
+  if (/^cmi\.interactions\.\d+\.result$/.test(el) && !RESULTS.has(v) && !isFinite(Number(v))) return '406';
+  return '';
+}
+
 /**
  * SCORM 2004 array rules for cmi.interactions (and its objectives): a new
  * entry must be created at index _count, and by setting its id first.
@@ -151,7 +163,7 @@ const ERROR_STRINGS = {
   '112': 'Termination before initialization', '122': 'Retrieve data before initialization',
   '132': 'Store data before initialization', '142': 'Commit before initialization',
   '201': 'General argument error', '351': 'General set failure',
-  '404': 'Data model element is read only', '408': 'Data model dependency not established',
+  '404': 'Data model element is read only', '406': 'Data model element type mismatch', '408': 'Data model dependency not established',
 };
 
 /** Add two ISO 8601 PTnHnMnS durations. */

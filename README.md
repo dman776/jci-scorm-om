@@ -25,7 +25,7 @@ npm start            # authoring app at http://127.0.0.1:4173/
 5. **Publish** — validate, then **Build SCORM ZIP**.
 
 ```bash
-npm test                 # 198 tests
+npm test                 # 199 tests
 npm run build:template   # writes samples/template.xlsx
 npm run export:demo      # builds out/<course>_SCORM2004.zip
 npm run typecheck        # tsc --noEmit
@@ -181,21 +181,28 @@ Each answer is also reported as a `cmi.interactions` entry so LMS reports can sh
 | Question type | `type` | `learner_response` |
 |---|---|---|
 | Yes / No, Acknowledgement | `true-false` | `true` / `false` |
-| Single select, Multiple select, Checklist | `choice` | option ids, joined with `[,]` |
+| Single select, Multiple select, Checklist | `long-fill-in` | option **labels**, joined with `; ` |
 | Rating | `likert` | the scale **value** (never the label) |
 | Numeric | `numeric` | the number |
 | Short text, Date, Evidence (file name) | `fill-in` | the text (≤ 250 characters) |
 | Long text, URL | `long-fill-in` | the text (≤ 4000 characters) |
 
-Each entry also carries `id` (the question id), `description` (the prompt, ≤ 250 characters), `objectives.0.id` (the section id), `timestamp`, and `result`: **`correct`** when the answer satisfies its question, **`incorrect`** when it is partial (numeric out of range, checklist missing an expected option, malformed url) or cleared. `correct_responses` is never written, because a checklist allows extra selections and the SCORM `choice` pattern demands an exact match.
+Each entry also carries `id` (the question id), `description` (the prompt, ≤ 250 characters), `objectives.0.id` (the section id), `timestamp` (UTC, e.g. `2026-09-24T13:05:09.12Z`), and `result`:
+
+- **`correct` / `incorrect`** only for questions with a requirement to meet: a checklist or multiple select with expected options, a numeric with a min, max, or whole-number rule, and a url. `incorrect` means partial (out of range, an expected option missing, a malformed url) or cleared.
+- **`neutral`** for everything else. A survey answer has no right answer, so reporting it as `correct` would be meaningless.
+
+Choice questions are reported as text rather than SCORM `choice`, because LMS reports (Workday Learning included) print `learner_response` verbatim, and `choice` only allows option ids such as `o_wi7km0kr`. Ratings still report the scale value, the same value suspend data stores. `correct_responses` is never written, because a checklist allows extra selections and an exact-match pattern would mark valid answers wrong.
 
 Things worth knowing:
 
 - **Written on navigation, not per keystroke.** Answers are flushed on Next / Back / section change / exit. Some LMSs journal every interaction write, and typing would otherwise fill the report with partial answers.
 - **Short text is capped at 250 characters** in the runtime, the SCORM `fill-in` limit, so the LMS always holds the whole answer. Long text over 4000 characters is truncated in the report only; the full text stays in suspend data.
+- **Timestamps include fractional seconds.** SCORM's time format only allows the `Z` time zone after them, and a strict LMS drops `…:09Z`. `MockLMS` rejects that form too.
+- **An interaction's `type` is rewritten on every update**, so an entry created by an older package (for example as `choice`) accepts the current response format.
 - **Interactions cannot be deleted.** A blank answer never creates one; clearing an answer that was already reported overwrites it with an empty response and `incorrect`. A cleared numeric keeps its last value, since an empty value is not a valid number.
 - **SCORM guarantees 250 interactions.** Validation warns above that (`interactions-over-limit`); later answers are still saved for resume but not reported.
-- **Identifiers must be LMS-safe.** Question ids, option ids, and rating values are written as identifiers. Validation warns (`interaction-bad-identifier`) on anything outside letters, numbers, and `. _ ~ : -`, such as a custom scale value `Strongly Agree`.
+- **Identifiers must be LMS-safe.** Question ids and rating values are written as identifiers. Validation warns (`interaction-bad-identifier`) on anything outside letters, numbers, and `. _ ~ : -`, such as a custom scale value `Strongly Agree`.
 
 ---
 
@@ -247,7 +254,7 @@ Columns are matched **by header name**, not position, so older templates still i
 ## Tests
 
 ```bash
-npm test    # 198 tests
+npm test    # 199 tests
 ```
 
 | Suite | Covers |
@@ -259,7 +266,7 @@ npm test    # 198 tests
 | `section-lock.test.js` (20) | the lock rule, editable-until-you-leave, every commit path, write rejection, suspend/resume persistence, v2 payloads, read-only rendering, the authoring warning |
 | `export.test.js` (17) | package structure, **every relative import resolving inside the ZIP**, no workspace imports, manifest completeness, scale inlining, Excel round-trip |
 | `changes.test.js` (13) | whole-workbook PDF download from the header, including the blocked-download fallback |
-| `interactions.test.js` (18) | type mapping, SCORM response formats, text sanitizing and truncation, correct/incorrect, flush-on-navigation, resume without duplicates, locking, the 250 limit, `MockLMS` array rules |
+| `interactions.test.js` (19) | type mapping, SCORM response formats, text sanitizing and truncation, correct/incorrect, flush-on-navigation, resume without duplicates, locking, the 250 limit, `MockLMS` array rules |
 | `mock-lms-suspend-resume.test.js` (13) | real `SessionCore` against `MockLMS`: suspend/resume, partial persistence, read-only `cmi.learner_name` |
 | `wiring.test.js` (10) | the shipped package renders labeled scales, stores values not labels, and keeps legacy inline scales working |
 | `scale-excel.test.js` (6) | the Questions sheet `Rating Scale` column: ids, names, explicit points, bare labels, round-trip |

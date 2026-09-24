@@ -154,11 +154,11 @@ export function validateWorkbook(workbook, opts = {}) {
         errors.push({ code: 'evidence-stores-file', message: `Evidence question "${q.id}" is configured to store a file in SCORM. Evidence questions may record metadata only.`, ref: q.id });
       }
       // ---- cmi.interactions identifiers ----
-      // Question ids, option ids, and rating values are written to the LMS as
-      // identifiers; anything outside the safe set may be rejected there.
+      // Question ids and rating values are written to the LMS as identifiers;
+      // anything outside the safe set may be rejected there. (Choice options
+      // are reported by label, so their ids are free.)
       if (reportInteractions) {
         const unsafe = [q.id];
-        if (CHOICE_TYPES.includes(q.type)) unsafe.push(...(q.options || []).map((o) => o.id));
         if (q.type === 'rating') unsafe.push(...resolveScalePoints(q, scaleIndex).map((p) => p.value));
         const bad = unsafe.filter((v) => v !== undefined && !isSafeIdentifier(v));
         if (bad.length) {

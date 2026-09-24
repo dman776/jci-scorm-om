@@ -87,7 +87,7 @@ export function renderHelp(mount) {
 
     section('Data, saving, and limits', [
       p('Learner responses are stored compactly (ids and values only, no prompt text) in cmi.suspend_data, which SCORM 2004 guarantees to hold at least 64000 characters. The Publish screen estimates worst-case usage and warns before you get close to the limit.'),
-      p('Each answer is also reported to the LMS as a cmi.interactions entry (question, answer, and correct / incorrect against the question\u2019s requirement) so LMS reports can show question-by-question results. Answers are sent when the learner moves between questions or exits, not while typing. Short-text answers are limited to 250 characters so the report holds the whole answer. Turn this off in Settings for workbooks with sensitive free text.'),
+      p('Each answer is also reported to the LMS as a cmi.interactions entry (question, answer as the learner saw it, and correct / incorrect for questions with a requirement such as expected checklist options or a numeric minimum; neutral otherwise) so LMS reports can show question-by-question results. Answers are sent when the learner moves between questions or exits, not while typing. Short-text answers are limited to 250 characters so the report holds the whole answer. Turn this off in Settings for workbooks with sensitive free text.'),
     ]),
   ]));
 }

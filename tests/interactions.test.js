@@ -35,7 +35,7 @@ test('every question type maps to a specific interaction type', () => {
     assert.notEqual(interactionType({ type }), 'other', `${type} has a mapping`);
   }
   assert.equal(interactionType({ type: 'yes_no' }), 'true-false');
-  assert.equal(interactionType({ type: 'checklist' }), 'choice');
+  assert.equal(interactionType({ type: 'checklist' }), 'long-fill-in', 'labels are text');
   assert.equal(interactionType({ type: 'rating' }), 'likert');
   assert.equal(interactionType({ type: 'short_text' }), 'fill-in');
   assert.equal(interactionType({ type: 'url' }), 'long-fill-in');
@@ -46,8 +46,10 @@ test('learner_response uses SCORM formats and stored values', () => {
   assert.equal(f({ type: 'yes_no' }, 'yes'), 'true');
   assert.equal(f({ type: 'yes_no' }, 'no'), 'false');
   assert.equal(f({ type: 'acknowledgement' }, true), 'true');
-  assert.equal(f({ type: 'single_select' }, 'o_ride'), 'o_ride');
-  assert.equal(f({ type: 'checklist', options: [] }, ['o_scope', 'o_safety']), 'o_scope[,]o_safety');
+  const options = [{ id: 'o_scope', label: 'Scope review' }, { id: 'o_safety', label: 'Safety plan' }, { id: 'o_ride', label: 'Ride along' }];
+  assert.equal(f({ type: 'single_select', options }, 'o_ride'), 'Ride along', 'the label, not the option id');
+  assert.equal(f({ type: 'checklist', options }, ['o_safety', 'o_scope']), 'Scope review; Safety plan', 'authored order');
+  assert.equal(f({ type: 'checklist', options }, ['o_scope', 'o_gone']), 'Scope review; o_gone', 'a deleted option still shows');
   assert.equal(f({ type: 'rating', scale: [1, 2, 3, 4, 5] }, '4'), '4', 'the value, never the label');
   assert.equal(f({ type: 'numeric' }, ' 6 '), '6');
   assert.equal(f({ type: 'datetime' }, '2026-09-14'), '2026-09-14');
@@ -81,7 +83,7 @@ test('cleared answers produce an empty (or false) response', () => {
   assert.equal(formatLearnerResponse({ type: 'numeric' }, ''), null, 'not representable as a real');
 });
 
-test('result is correct when complete and incorrect when partial', () => {
+test('result is correct/incorrect only where a requirement exists', () => {
   const checklist = { type: 'checklist', options: [{ id: 'a', expected: true }, { id: 'b' }] };
   assert.equal(interactionResult(checklist, ['a', 'b']), 'correct', 'extra selections allowed');
   assert.equal(interactionResult(checklist, ['b']), 'incorrect', 'missing an expected option');
@@ -89,11 +91,15 @@ test('result is correct when complete and incorrect when partial', () => {
   assert.equal(interactionResult(numeric, '6'), 'correct');
   assert.equal(interactionResult(numeric, '2'), 'incorrect');
   assert.equal(interactionResult({ type: 'url' }, 'not a url'), 'incorrect');
-  assert.equal(interactionResult({ type: 'short_text' }, 'Dana'), 'correct');
+  assert.equal(interactionResult({ type: 'short_text' }, 'Dana'), 'neutral');
+  assert.equal(interactionResult({ type: 'yes_no' }, 'no'), 'neutral', 'a survey answer is never wrong');
+  assert.equal(interactionResult({ type: 'rating', scale: [1, 2, 3] }, '1'), 'neutral');
+  assert.equal(interactionResult({ type: 'checklist', options: [{ id: 'a' }] }, ['a']), 'neutral', 'no expected options');
+  assert.equal(interactionResult({ type: 'numeric' }, '2'), 'neutral', 'no bounds');
 });
 
-test('timestamps are SCORM time with whole seconds', () => {
-  assert.equal(toScormTimestamp(new Date('2026-09-24T13:05:09.123Z')), '2026-09-24T13:05:09Z');
+test('timestamps carry fractional seconds, which the Z requires', () => {
+  assert.equal(toScormTimestamp(new Date('2026-09-24T13:05:09.123Z')), '2026-09-24T13:05:09.12Z');
 });
 
 // ---- session against MockLMS ---------------------------------------------
@@ -123,11 +129,11 @@ test('answers are committed as complete interactions', async () => {
     { ...date, timestamp: undefined },
     {
       id: 'q_s1_1', type: 'fill-in', description: 'Date of the install team meeting',
-      'objectives.0.id': 's1', learner_response: '2026-09-14', result: 'correct', timestamp: undefined,
+      'objectives.0.id': 's1', learner_response: '2026-09-14', result: 'neutral', timestamp: undefined,
     });
-  assert.match(date.timestamp, /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ$/);
-  assert.equal(checklist.type, 'choice');
-  assert.equal(checklist.learner_response, 'o_sched');
+  assert.match(date.timestamp, /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d\dZ$/);
+  assert.equal(checklist.type, 'long-fill-in');
+  assert.equal(checklist.learner_response, 'Schedule');
   assert.equal(checklist.result, 'incorrect', 'expected options missing');
 });
 
@@ -225,6 +231,33 @@ test('MockLMS enforces the interactions array rules', () => {
   assert.equal(api.SetValue('cmi.interactions.0.id', 'q'), 'true');
   assert.equal(api.GetValue('cmi.interactions._count'), '1');
   assert.equal(api.SetValue('cmi.interactions._count', '5'), 'false');
+  assert.equal(api.SetValue('cmi.interactions.0.timestamp', '2026-09-24T13:05:09Z'), 'false', 'Z without .s');
+  assert.equal(api.GetLastError(), '406');
+  assert.equal(api.SetValue('cmi.interactions.0.timestamp', '2026-09-24T13:05:09.12Z'), 'true');
+  assert.equal(api.SetValue('cmi.interactions.0.result', 'wrong'), 'false');
+  assert.equal(api.SetValue('cmi.interactions.0.result', 'neutral'), 'true');
+});
+
+test('an entry created by an older package is retyped on update', async () => {
+  const wb = await runtime();
+  const lms = new MockLMS();
+  const api = lms.newAttempt();
+  api.Initialize('');
+  api.SetValue('cmi.interactions.0.id', 'q_s1_3');
+  api.SetValue('cmi.interactions.0.type', 'choice');
+  api.SetValue('cmi.interactions.0.learner_response', 'o_scope');
+  api.SetValue('cmi.exit', 'suspend');
+  api.Terminate('');
+
+  const { session } = mk(wb, lms);
+  session.openSection('s1');
+  session.setResponse('q_s1_3', ['o_scope', 'o_safety']);
+  session.suspendAndExit();
+  const [entry] = lms.interactions();
+  assert.equal(lms.interactions().length, 1);
+  assert.equal(entry.type, 'long-fill-in');
+  assert.equal(entry.learner_response, 'Scope review; Safety plan');
+  assert.equal(entry.result, 'correct', 'both expected options selected');
 });
 
 test('validation warns on identifiers an LMS may reject', async () => {

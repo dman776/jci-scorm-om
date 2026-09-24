@@ -123,13 +123,15 @@ export class SessionCore {
         if (String(set(n, 'id', questionId)) !== 'true') continue;
         this._interactionIndex[questionId] = n;
         this._interactionCount++;
-        set(n, 'type', interactionType(question));
         set(n, 'description', interactionDescription(question, this._lang));
         set(n, 'objectives.0.id', this._sectionOfQuestion[questionId]);
       }
+      // type is rewritten every time: an entry created by an older package
+      // may carry a type the current learner_response format does not match.
+      set(n, 'type', interactionType(question));
+      set(n, 'timestamp', toScormTimestamp());
       if (response !== null) set(n, 'learner_response', response);
       set(n, 'result', interactionResult(question, value));
-      set(n, 'timestamp', toScormTimestamp());
     }
     this._dirtyInteractions.clear();
   }
