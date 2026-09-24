@@ -8,6 +8,8 @@
  *
  * Expected options: prefix an option label with `*` to mark it expected, e.g.
  *   Scope review | *Safety plan | Schedule
+ * Expected column (report-only): yes / no for yes_no, and a scale value or
+ * label for rating, meaning "this point or higher".
  *
  * Rating Scale accepts, in precedence order:
  *   agreement-5                    a scale id from the library
@@ -20,7 +22,7 @@
  */
 import { writeXlsx, readXlsx } from './index.js';
 import { newOptionId } from '@sowb/shared/ids.js';
-import { buildScaleIndex, listScales, CUSTOM_SCALE_ID } from '@sowb/shared/scales.js';
+import { buildScaleIndex, listScales, resolveScalePoints, CUSTOM_SCALE_ID } from '@sowb/shared/scales.js';
 
 /**
  * Parse an uploaded xlsx buffer into a workbook object.
@@ -150,12 +152,16 @@ export async function buildTemplateXlsx() {
     ['  Required       yes or no. Only required questions gate section completion.'],
     ['  Options        Pipe-delimited choices for single_select / multiple_select / checklist, e.g. Yes | No | N/A'],
     ['                 Prefix an option with * to mark it EXPECTED, e.g. Scope review | *Safety plan'],
+    ['                 On single_select, EXPECTED only sets correct / incorrect in the LMS report.'],
     ['  Rating Scale   A scale id (agreement-5), a scale name (Agreement (5-point)),'],
     ['                 explicit points (1=Strongly Agree | 2=Agree | 3=Neutral),'],
     ['                 bare labels (Low|Medium|High), or 1-5 for the numeric built-in.'],
     ['  Min            For numeric questions. Inclusive lower bound, e.g. 4'],
     ['  Max            For numeric questions. Inclusive upper bound, e.g. 10'],
     ['  Whole Numbers  For numeric questions. yes to reject decimals.'],
+    ['  Expected       Optional, report-only. yes_no: yes or no. rating: a scale value or label,'],
+    ['                 meaning that point or higher. Sets correct / incorrect in the LMS report;'],
+    ['                 any answer still completes the question.'],
     ['  Help Text      Optional guidance shown under the prompt.'],
     [''],
     ['Built-in rating scales:'],
@@ -203,18 +209,18 @@ export async function buildTemplateXlsx() {
   ];
 
   const questions = [
-    ['Section ID', 'Type', 'Prompt', 'Required', 'Options', 'Rating Scale', 'Min', 'Max', 'Whole Numbers', 'Help Text'],
-    ['s1', 'datetime', 'Date of the install team meeting', 'yes', '', '', '', '', '', 'Use the date the meeting took place.'],
-    ['s1', 'long_text', 'What was discussed in the meeting?', 'yes', '', '', '', '', '', 'Summarize scope, safety, and roles.'],
-    ['s1', 'checklist', 'Which topics were covered?', 'yes', '*Scope review | *Safety plan | Schedule | Customer expectations', '', '', '', '', 'Check all that apply.'],
-    ['s2', 'short_text', 'Manager you shadowed', 'yes', '', '', '', '', '', ''],
-    ['s2', 'numeric', 'How many install jobs did you review this month?', 'yes', '', '', '4', '', 'yes', 'Review at least four jobs.'],
-    ['s2', 'rating', 'The install handoff process was clearly explained.', 'yes', '', 'agreement-5', '', '', '', ''],
-    ['s2', 'rating', 'How often did the team run a safety briefing?', 'yes', '', 'frequency-5', '', '', '', ''],
-    ['s3', 'yes_no', 'Did you complete a full ride-along day?', 'yes', '', '', '', '', '', ''],
-    ['s3', 'rating', 'Rate your understanding of on-site install steps', 'yes', '', '1-5', '', '', '', '1 = low, 5 = high'],
-    ['s3', 'url', 'Link to your ride-along notes or photos', 'no', '', '', '', '', '', 'Paste a SharePoint or Teams link starting with https://'],
-    ['s3', 'long_text', 'Notes and observations from the ride along', 'no', '', '', '', '', '', ''],
+    ['Section ID', 'Type', 'Prompt', 'Required', 'Options', 'Rating Scale', 'Min', 'Max', 'Whole Numbers', 'Expected', 'Help Text'],
+    ['s1', 'datetime', 'Date of the install team meeting', 'yes', '', '', '', '', '', '', 'Use the date the meeting took place.'],
+    ['s1', 'long_text', 'What was discussed in the meeting?', 'yes', '', '', '', '', '', '', 'Summarize scope, safety, and roles.'],
+    ['s1', 'checklist', 'Which topics were covered?', 'yes', '*Scope review | *Safety plan | Schedule | Customer expectations', '', '', '', '', '', 'Check all that apply.'],
+    ['s2', 'short_text', 'Manager you shadowed', 'yes', '', '', '', '', '', '', ''],
+    ['s2', 'numeric', 'How many install jobs did you review this month?', 'yes', '', '', '4', '', 'yes', '', 'Review at least four jobs.'],
+    ['s2', 'rating', 'The install handoff process was clearly explained.', 'yes', '', 'agreement-5', '', '', '', 'Agree', ''],
+    ['s2', 'rating', 'How often did the team run a safety briefing?', 'yes', '', 'frequency-5', '', '', '', '', ''],
+    ['s3', 'yes_no', 'Did you complete a full ride-along day?', 'yes', '', '', '', '', '', 'yes', ''],
+    ['s3', 'rating', 'Rate your understanding of on-site install steps', 'yes', '', '1-5', '', '', '', '', '1 = low, 5 = high'],
+    ['s3', 'url', 'Link to your ride-along notes or photos', 'no', '', '', '', '', '', '', 'Paste a SharePoint or Teams link starting with https://'],
+    ['s3', 'long_text', 'Notes and observations from the ride along', 'no', '', '', '', '', '', '', ''],
   ];
 
   return writeXlsx([
@@ -287,6 +293,7 @@ function attachQuestions(sections, rows, warnings, customScales) {
     required: ['required'], options: ['options'], scale: ['rating scale', 'scale'],
     min: ['min', 'minimum'], max: ['max', 'maximum'],
     integer: ['whole numbers', 'integer only', 'whole numbers only'],
+    expected: ['expected', 'expected answer'],
     help: ['help text', 'help'],
   });
   let qn = 0;
@@ -324,6 +331,21 @@ function attachQuestions(sections, rows, warnings, customScales) {
       if (parsed.warning) warnings.push(`Questions row ${r + 1}: ${parsed.warning}`);
       if (parsed.scaleId) q.scaleId = parsed.scaleId;
       if (parsed.scale) q.scale = parsed.scale;
+      const expected = cell(row, idx.expected);
+      if (expected) {
+        // Match a stored value first, then a label, so "4" and "Agree" both work.
+        const points = resolveScalePoints(q, buildScaleIndex(customScales));
+        const point = points.find((p) => String(p.value) === expected)
+          || points.find((p) => String(p.label).toLowerCase() === expected.toLowerCase());
+        if (point) q.expectedMin = point.value;
+        else warnings.push(`Questions row ${r + 1}: Expected "${expected}" is not on the rating scale and was ignored.`);
+      }
+    }
+
+    if (type === 'yes_no') {
+      const expected = cell(row, idx.expected).toLowerCase();
+      if (expected === 'yes' || expected === 'no') q.expectedAnswer = expected;
+      else if (expected) warnings.push(`Questions row ${r + 1}: Expected "${expected}" must be yes or no and was ignored.`);
     }
 
     if (type === 'numeric') {

@@ -25,7 +25,7 @@ npm start            # authoring app at http://127.0.0.1:4173/
 5. **Publish** — validate, then **Build SCORM ZIP**.
 
 ```bash
-npm test                 # 199 tests
+npm test                 # 205 tests
 npm run build:template   # writes samples/template.xlsx
 npm run export:demo      # builds out/<course>_SCORM2004.zip
 npm run typecheck        # tsc --noEmit
@@ -74,6 +74,16 @@ A section can also opt in to freezing its answers once it reaches *Completed* �
 **URL.** Must be a valid `http://` or `https://` link; anything else is *partial*. Validation is structural only (no network calls).
 
 **Rating.** The value must be one of the points in its scale. A value orphaned by a later scale edit becomes *partial*, not complete.
+
+**Expected answers that only affect reporting: single select, yes / no, rating.** These never block completion; any answer completes the question. They only decide `correct` / `incorrect` in the [LMS report](#lms-reporting-cmiinteractions), and the learner never sees them.
+
+| Type | How to set it | Reports `correct` when |
+|---|---|---|
+| Single select | Tick **Expected** on one or more options (Excel: `*` prefix) | the chosen option is Expected |
+| Yes / No | **Expected answer**: Yes or No (Excel: `Expected` column, `yes`/`no`) | the answer matches |
+| Rating | **Expected answer**: *point or higher* (Excel: `Expected` column, a value or label) | the answer is at or above that point |
+
+Rating "higher" compares numeric values as numbers, so *Agree (4) or higher* includes Strongly Agree (5) whatever order the scale is listed in. Scales with word values (Low / Medium / High) rank by listed order, with the last point highest.
 
 ---
 
@@ -189,7 +199,7 @@ Each answer is also reported as a `cmi.interactions` entry so LMS reports can sh
 
 Each entry also carries `id` (the question id), `description` (the prompt, ≤ 250 characters), `objectives.0.id` (the section id), `timestamp` (UTC, e.g. `2026-09-24T13:05:09.12Z`), and `result`:
 
-- **`correct` / `incorrect`** only for questions with a requirement to meet: a checklist or multiple select with expected options, a numeric with a min, max, or whole-number rule, and a url. `incorrect` means partial (out of range, an expected option missing, a malformed url) or cleared.
+- **`correct` / `incorrect`** only for questions with something to check: a checklist or multiple select with expected options, a numeric with a min, max, or whole-number rule, a url, and a single select, yes / no, or rating with an [expected answer](#completion-rules-by-type). `incorrect` means partial (out of range, an expected option missing, a malformed url), not the expected answer, or cleared.
 - **`neutral`** for everything else. A survey answer has no right answer, so reporting it as `correct` would be meaningless.
 
 Choice questions are reported as text rather than SCORM `choice`, because LMS reports (Workday Learning included) print `learner_response` verbatim, and `choice` only allows option ids such as `o_wi7km0kr`. Ratings still report the scale value, the same value suspend data stores. `correct_responses` is never written, because a checklist allows extra selections and an exact-match pattern would mark valid answers wrong.
@@ -254,7 +264,7 @@ Columns are matched **by header name**, not position, so older templates still i
 ## Tests
 
 ```bash
-npm test    # 199 tests
+npm test    # 205 tests
 ```
 
 | Suite | Covers |
@@ -266,7 +276,7 @@ npm test    # 199 tests
 | `section-lock.test.js` (20) | the lock rule, editable-until-you-leave, every commit path, write rejection, suspend/resume persistence, v2 payloads, read-only rendering, the authoring warning |
 | `export.test.js` (17) | package structure, **every relative import resolving inside the ZIP**, no workspace imports, manifest completeness, scale inlining, Excel round-trip |
 | `changes.test.js` (13) | whole-workbook PDF download from the header, including the blocked-download fallback |
-| `interactions.test.js` (19) | type mapping, SCORM response formats, text sanitizing and truncation, correct/incorrect, flush-on-navigation, resume without duplicates, locking, the 250 limit, `MockLMS` array rules |
+| `interactions.test.js` (25) | type mapping, SCORM response formats, text sanitizing and truncation, correct/incorrect, flush-on-navigation, resume without duplicates, locking, the 250 limit, `MockLMS` array rules |
 | `mock-lms-suspend-resume.test.js` (13) | real `SessionCore` against `MockLMS`: suspend/resume, partial persistence, read-only `cmi.learner_name` |
 | `wiring.test.js` (10) | the shipped package renders labeled scales, stores values not labels, and keeps legacy inline scales working |
 | `scale-excel.test.js` (6) | the Questions sheet `Rating Scale` column: ids, names, explicit points, bare labels, round-trip |

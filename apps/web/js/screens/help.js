@@ -37,7 +37,7 @@ export function renderHelp(mount) {
         ['URL / link', 'A valid http:// or https:// link. Invalid text is partial. Valid links render as a clickable preview.'],
         ['Rating', 'A point from a rating scale. Scales come from the Rating Scales library, or can be one-off per question.'],
         ['Checklist', 'Behavioral items the learner checks off. Options marked Expected must all be selected.'],
-        ['Single select', 'One choice from a list (post-MVP).'],
+        ['Single select', 'One choice from a list. Options marked Expected only affect the LMS report (post-MVP).'],
         ['Multiple select', 'One or more choices; supports Expected options (post-MVP).'],
         ['Date', 'When the activity occurred (post-MVP).'],
         ['Acknowledgement', 'A confirmation checkbox (post-MVP).'],
@@ -52,9 +52,10 @@ export function renderHelp(mount) {
       p('Short labels (numbers) render as a row of chips; longer labels render one row per point with a value badge, which reads correctly on a phone and in a screen reader. For a short numeric scale you can add optional end captions, e.g. "Not at all" and "Expert".'),
     ]),
 
-    section('Expected options on checklists', [
+    section('Expected answers', [
       p('On a checklist or multiple select, tick Expected next to any option the learner must select. The question only counts as complete once every expected option is checked. Extra, non-expected selections are allowed and never block completion.'),
-      p('Expected options are never visually marked in the learner runtime, so learners cannot see which boxes are required. When a requirement is unmet they see a neutral hint: "Some required items are not yet selected." The downloadable PDF follows the same rule and never reveals the expected options.'),
+      p('On a single select, yes / no, or rating question, the Expected answer only affects the LMS report: a matching answer reports as correct and any other as incorrect. Any answer still completes the question. For a single select, tick Expected on the acceptable options; for yes / no, pick Yes or No; for a rating, pick a point, and answers at or above it count as correct. With no Expected answer set, these questions report as neutral.'),
+      p('Expected options are never visually marked in the learner runtime, so learners cannot see which boxes are required. When a requirement is unmet they see a neutral hint: "Some required items are not yet selected." The downloadable PDF follows the same rule and never reveals the expected options or answers.'),
     ]),
 
     section('Learner PDF download', [

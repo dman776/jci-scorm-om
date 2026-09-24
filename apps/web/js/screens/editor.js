@@ -20,6 +20,8 @@ const ALL_TYPES = [
 const CHOICE_TYPES = ['single_select', 'multiple_select', 'checklist'];
 /** Types where an option flagged "expected" must be selected to complete. */
 const EXPECTED_GATED = ['checklist', 'multiple_select'];
+/** Types where "expected" only decides correct / incorrect in the LMS report. */
+const EXPECTED_REPORTED = ['single_select'];
 
 let selectedSectionId = null;
 /** Scale library, fetched once and reused across re-renders. */
@@ -151,6 +153,7 @@ function renderQuestionCard(section, q, qi, store, rerender) {
     ]),
     CHOICE_TYPES.includes(q.type) ? renderOptions(q, store, rerender) : null,
     q.type === 'rating' ? renderRatingEditor(q, store, rerender, scaleLibrary || []) : null,
+    q.type === 'yes_no' ? renderYesNo(q, store, rerender) : null,
     q.type === 'numeric' ? renderNumeric(q, store, rerender) : null,
     q.type === 'url' ? renderUrlNote() : null,
   ]);
@@ -159,6 +162,7 @@ function renderQuestionCard(section, q, qi, store, rerender) {
 function renderOptions(q, store, rerender) {
   if (!q.options) q.options = [];
   const gated = EXPECTED_GATED.includes(q.type);
+  const reported = EXPECTED_REPORTED.includes(q.type);
   const expectedCount = q.options.filter((o) => o.expected).length;
   return h('div.options-block', [
     h('span.field-label', 'Options'),
@@ -166,13 +170,15 @@ function renderOptions(q, store, rerender) {
       ? h('p.block-hint', expectedCount
           ? `The learner must select all ${expectedCount} option${expectedCount === 1 ? '' : 's'} marked Expected for this question to count as complete. Expected options are never marked for the learner.`
           : 'Mark an option Expected to require the learner to select it. With none marked, any selection completes the question.')
-      : h('p.block-hint', 'Expected gating applies only to checklist and multiple select.'),
+      : h('p.block-hint', expectedCount
+          ? 'Picking an option marked Expected reports as correct in the LMS; any other option reports as incorrect. Any answer still completes the question, and Expected options are never marked for the learner.'
+          : 'Optionally mark the answer(s) you expect. The LMS report then shows correct or incorrect; with none marked, every answer reports as neutral. Any answer completes the question.'),
     h('ul.opt-list', q.options.map((o) => h('li.opt-row', [
       h('input', { type: 'text', value: o.label, oninput: (e) => store.update(() => { o.label = e.target.value; }) }),
       h('label.opt-expected' + (o.expected ? '.on' : ''), {
-        title: gated ? 'The learner must select this option to complete the question.' : 'Expected has no effect on this question type.',
+        title: gated ? 'The learner must select this option to complete the question.' : 'Choosing this option reports as correct in the LMS.',
       }, [
-        h('input', { type: 'checkbox', checked: !!o.expected, disabled: !gated,
+        h('input', { type: 'checkbox', checked: !!o.expected, disabled: !gated && !reported,
           onchange: (e) => { store.update(() => { o.expected = e.target.checked; }); rerender(); } }),
         h('span', 'Expected'),
       ]),
@@ -212,6 +218,29 @@ function renderNumeric(q, store, rerender) {
   ]);
 }
 
+/** Report-only Expected answer for a yes / no question. */
+function renderYesNo(q, store, rerender) {
+  const current = q.expectedAnswer === 'yes' || q.expectedAnswer === 'no' ? q.expectedAnswer : '';
+  return h('div.yesno-block', [
+    h('label.field', [
+      h('span.field-label', 'Expected answer (optional)'),
+      h('select', {
+        onchange: (e) => {
+          store.update(() => { if (e.target.value) q.expectedAnswer = e.target.value; else delete q.expectedAnswer; });
+          rerender();
+        },
+      }, [
+        h('option', { value: '', selected: current === '' }, 'None: report every answer as neutral'),
+        h('option', { value: 'yes', selected: current === 'yes' }, 'Yes'),
+        h('option', { value: 'no', selected: current === 'no' }, 'No'),
+      ]),
+      h('span.field-hint', current
+        ? `Answering ${current === 'yes' ? 'Yes' : 'No'} reports as correct in the LMS; the other answer reports as incorrect. Either answer still completes the question, and the learner never sees the expected answer.`
+        : 'Pick an answer to have the LMS report show correct or incorrect. Either answer still completes the question.'),
+    ]),
+  ]);
+}
+
 function renderUrlNote() {
   return h('div.url-block', [
     h('span.field-label', 'Link rule'),
@@ -239,6 +268,9 @@ function previewRule(q) {
 
 function changeType(q, type) {
   q.type = type;
+  // Expected answers belong to one type; a stale one would silently re-apply.
+  if (type !== 'yes_no') delete q.expectedAnswer;
+  if (type !== 'rating') delete q.expectedMin;
   if (CHOICE_TYPES.includes(type)) {
     if (!q.options || !q.options.length) q.options = [{ id: newOptionId(), label: 'Option 1' }, { id: newOptionId(), label: 'Option 2' }];
     delete q.scaleId; delete q.scale; delete q.scaleName; delete q.minLabel; delete q.maxLabel;

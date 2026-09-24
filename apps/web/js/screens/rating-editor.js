@@ -58,7 +58,40 @@ export function renderRatingEditor(q, store, rerender, scaleLibrary) {
         ])
       : null,
 
+    renderExpected(q, points, store, rerender),
+
     renderPreview(points, q),
+  ]);
+}
+
+/**
+ * Report-only Expected minimum: answers at or above it report as correct in
+ * the LMS. Numeric values rank as numbers; word values rank by listed order.
+ */
+function renderExpected(q, points, store, rerender) {
+  if (points.length < 2) return null;
+  const current = q.expectedMin === undefined || q.expectedMin === null ? '' : String(q.expectedMin);
+  const found = points.some((p) => String(p.value) === current);
+  const numeric = points.every((p) => p.value !== '' && isFinite(Number(p.value)));
+  const name = (p) => (String(p.label) === String(p.value) ? String(p.label) : `${p.label} (${p.value})`);
+  return h('label.field', [
+    h('span.field-label', 'Expected answer (optional)'),
+    h('select', {
+      onchange: (e) => {
+        store.update(() => {
+          const p = points.find((x) => String(x.value) === e.target.value);
+          if (p) q.expectedMin = p.value; else delete q.expectedMin;
+        });
+        rerender();
+      },
+    }, [
+      h('option', { value: '', selected: current === '' }, 'None: report every answer as neutral'),
+      ...points.map((p) => h('option', { value: String(p.value), selected: current === String(p.value) }, `${name(p)} or higher`)),
+      current !== '' && !found ? h('option', { value: current, selected: true }, `${current} (no longer on this scale)`) : null,
+    ]),
+    h('span.field-hint', current === ''
+      ? 'Pick a minimum to have the LMS report show correct for answers at or above it and incorrect below it. Any answer still completes the question.'
+      : `Answers at or above this point report as correct in the LMS; lower answers report as incorrect. Any answer still completes the question, and the learner never sees the expected answer.${numeric ? '' : ' This scale ranks by its listed order, so the last point is the highest.'}`),
   ]);
 }
 

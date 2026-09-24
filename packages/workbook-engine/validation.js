@@ -7,7 +7,7 @@ import {
   QUESTION_TYPES, SUSPEND_DATA_LIMIT, SUSPEND_DATA_WARN_RATIO, EXPECTED_GATED_TYPES,
 } from '@sowb/shared/constants.js';
 import { isSafeIdentifier, INTERACTIONS_LIMIT } from './interactions.js';
-import { buildScaleIndex, resolveScalePoints, CUSTOM_SCALE_ID } from '@sowb/shared/scales.js';
+import { buildScaleIndex, resolveScalePoints, findScalePoint, CUSTOM_SCALE_ID } from '@sowb/shared/scales.js';
 
 const CHOICE_TYPES = ['single_select', 'multiple_select', 'checklist'];
 
@@ -145,8 +145,29 @@ export function validateWorkbook(workbook, opts = {}) {
         if (expected.length && !q.required) {
           warnings.push({ code: 'expected-on-optional', message: `Optional question "${q.id}" has expected options; they gate the question but the question does not gate the section.`, ref: q.id });
         }
+      } else if (q.type === 'single_select') {
+        // Report-only: Expected decides correct / incorrect, never completion.
+        if ((q.options || []).some((o) => o.expected) && !reportInteractions) {
+          warnings.push({ code: 'expected-not-reported', message: `Question "${q.id}" has expected options, but LMS answer reporting is off, so they have no effect.`, ref: q.id });
+        }
       } else if ((q.options || []).some((o) => o.expected)) {
-        warnings.push({ code: 'expected-ignored', message: `Question "${q.id}" has expected options, but expected gating only applies to checklist and multiple select.`, ref: q.id });
+        warnings.push({ code: 'expected-ignored', message: `Question "${q.id}" has expected options, but Expected only applies to checklist, multiple select, and single select.`, ref: q.id });
+      }
+
+      // ---- report-only Expected answers ----
+      if (q.type === 'yes_no' && q.expectedAnswer !== undefined && q.expectedAnswer !== '') {
+        if (q.expectedAnswer !== 'yes' && q.expectedAnswer !== 'no') {
+          warnings.push({ code: 'expected-answer-invalid', message: `Yes / No question "${q.id}" has expected answer "${q.expectedAnswer}"; it must be yes or no, so it is ignored.`, ref: q.id });
+        } else if (!reportInteractions) {
+          warnings.push({ code: 'expected-not-reported', message: `Question "${q.id}" has an expected answer, but LMS answer reporting is off, so it has no effect.`, ref: q.id });
+        }
+      }
+      if (q.type === 'rating' && q.expectedMin !== undefined && q.expectedMin !== null && q.expectedMin !== '') {
+        if (!findScalePoint(resolveScalePoints(q, scaleIndex), q.expectedMin)) {
+          warnings.push({ code: 'rating-expected-not-in-scale', message: `Rating question "${q.id}" expects "${q.expectedMin}" or higher, but that value is not on its scale, so every answer reports as neutral.`, ref: q.id });
+        } else if (!reportInteractions) {
+          warnings.push({ code: 'expected-not-reported', message: `Question "${q.id}" has an expected answer, but LMS answer reporting is off, so it has no effect.`, ref: q.id });
+        }
       }
 
       // evidence_ref must never be configured to store a binary in SCORM.

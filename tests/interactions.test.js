@@ -15,9 +15,11 @@ import {
   interactionType, formatLearnerResponse, interactionResult, interactionDescription,
   toScormTimestamp, INTERACTIONS_LIMIT,
 } from '@sowb/workbook-engine/interactions.js';
+import { getResponseState } from '@sowb/workbook-engine/completion.js';
+import { buildTemplateXlsx, importWorkbookXlsx } from '@sowb/excel-io/workbook-xlsx.js';
 import { SessionCore } from '../runtime-template/js/session.js';
 import { ScormAdapter } from '../runtime-template/js/adapter.js';
-import { loadWorkbook, loadWorkbookWith, loadCustomScales, answerAll } from './helpers/workbook.js';
+import { loadWorkbook, loadWorkbookWith, loadCustomScales, answerAll, COMPLETE_REQUIRED_RESPONSES } from './helpers/workbook.js';
 
 const runtime = async (wb) => inlineScales(wb || await loadWorkbook(), await loadCustomScales());
 function mk(workbook, lms) {
@@ -96,6 +98,76 @@ test('result is correct/incorrect only where a requirement exists', () => {
   assert.equal(interactionResult({ type: 'rating', scale: [1, 2, 3] }, '1'), 'neutral');
   assert.equal(interactionResult({ type: 'checklist', options: [{ id: 'a' }] }, ['a']), 'neutral', 'no expected options');
   assert.equal(interactionResult({ type: 'numeric' }, '2'), 'neutral', 'no bounds');
+});
+
+// ---- report-only Expected answers ----------------------------------------
+
+test('single select: an Expected option reports correct, others incorrect', () => {
+  const q = { type: 'single_select', options: [{ id: 'a', label: 'A', expected: true }, { id: 'b', label: 'B' }] };
+  assert.equal(interactionResult(q, 'a'), 'correct');
+  assert.equal(interactionResult(q, 'b'), 'incorrect');
+  assert.equal(getResponseState(q, 'b'), 'complete', 'report-only: completion is unaffected');
+  assert.equal(interactionResult({ ...q, options: [{ id: 'a' }, { id: 'b' }] }, 'b'), 'neutral');
+});
+
+test('yes / no: the Expected answer reports correct', () => {
+  const q = { type: 'yes_no', expectedAnswer: 'yes' };
+  assert.equal(interactionResult(q, 'yes'), 'correct');
+  assert.equal(interactionResult(q, true), 'correct');
+  assert.equal(interactionResult(q, 'no'), 'incorrect');
+  assert.equal(getResponseState(q, 'no'), 'complete');
+  assert.equal(interactionResult({ type: 'yes_no', expectedAnswer: 'maybe' }, 'no'), 'neutral', 'invalid expectation ignored');
+});
+
+test('rating: the Expected point or higher reports correct', () => {
+  // agreement-5 is listed 5..1; numeric values rank as numbers, not position.
+  const agree = { type: 'rating', expectedMin: 4, scale: [
+    { value: 5, label: 'Strongly Agree' }, { value: 4, label: 'Agree' }, { value: 3, label: 'Neutral' },
+    { value: 2, label: 'Disagree' }, { value: 1, label: 'Strongly Disagree' }] };
+  assert.equal(interactionResult(agree, '5'), 'correct');
+  assert.equal(interactionResult(agree, '4'), 'correct');
+  assert.equal(interactionResult(agree, '3'), 'incorrect');
+  assert.equal(getResponseState(agree, '1'), 'complete');
+  // Word values rank by listed order, low first.
+  const words = { type: 'rating', expectedMin: 'Medium', scale: ['Low', 'Medium', 'High'] };
+  assert.equal(interactionResult(words, 'High'), 'correct');
+  assert.equal(interactionResult(words, 'Medium'), 'correct');
+  assert.equal(interactionResult(words, 'Low'), 'incorrect');
+  assert.equal(interactionResult({ ...words, expectedMin: 'Gone' }, 'Low'), 'neutral', 'min not on scale');
+});
+
+test('a non-Expected answer still completes the workbook', async () => {
+  const wb = await runtime(await loadWorkbookWith((w) => {
+    w.sections[2].questions[0].expectedAnswer = 'yes'; // q_s3_1 yes_no
+  }));
+  const lms = new MockLMS();
+  const { session } = mk(wb, lms);
+  answerAll(session, { ...COMPLETE_REQUIRED_RESPONSES, q_s3_1: 'no' });
+  session.suspendAndExit();
+  assert.equal(lms.snapshot()['cmi.completion_status'], 'completed');
+  assert.equal(lms.interactions().find((i) => i.id === 'q_s3_1').result, 'incorrect');
+});
+
+test('validation: Expected answers that cannot apply are flagged', async () => {
+  const wb = await loadWorkbookWith((w) => {
+    const s4 = w.sections[3].questions;
+    s4.find((q) => q.type === 'single_select').options[0].expected = true;
+    w.sections[2].questions[0].expectedAnswer = 'maybe';
+    w.sections[1].questions[2].expectedMin = 9; // agreement-5 has no 9
+  });
+  const codes = validateWorkbook(wb, { customScales: await loadCustomScales() }).warnings.map((x) => x.code);
+  assert.ok(!codes.includes('expected-ignored'), 'single select supports Expected');
+  assert.ok(codes.includes('expected-answer-invalid'));
+  assert.ok(codes.includes('rating-expected-not-in-scale'));
+});
+
+test('Excel: the Expected column imports for yes / no and rating', async () => {
+  const { workbook, warnings } = await importWorkbookXlsx(await buildTemplateXlsx(), { customScales: await loadCustomScales() });
+  assert.deepEqual(warnings, []);
+  const all = workbook.sections.flatMap((s) => s.questions);
+  assert.equal(all.find((q) => q.type === 'yes_no').expectedAnswer, 'yes');
+  assert.equal(all.find((q) => q.scaleId === 'agreement-5').expectedMin, 4, '"Agree" label resolves to its value');
+  assert.equal(all.find((q) => q.scaleId === 'frequency-5').expectedMin, undefined);
 });
 
 test('timestamps carry fractional seconds, which the Z requires', () => {

@@ -8,16 +8,20 @@
  *    Learning among them) print learner_response verbatim and an option id
  *    means nothing to a reader. Ratings report the scale value, as suspend
  *    data does.
- *  - result is 'correct' / 'incorrect' only for questions with a requirement
- *    to meet (expected checklist options, numeric bounds, url format). Every
- *    other question is a survey item with no right answer, so it is 'neutral'.
+ *  - result is 'correct' / 'incorrect' only for questions with something to
+ *    check: a requirement (expected checklist options, numeric bounds, url
+ *    format) or an Expected answer (single select options, yes/no answer,
+ *    rating minimum). Expected answers are report-only and never gate
+ *    completion. Every other question is a survey item with no right answer,
+ *    so it is 'neutral'.
  *  - correct_responses is never written: a checklist allows extra selections,
  *    and the SCORM choice pattern demands an exact match.
  *
- * Copied verbatim into the exported package, so its only import is the equally
- * dependency-free completion module.
+ * Copied verbatim into the exported package, so its only imports are the
+ * equally dependency-free completion and scales modules.
  */
 import { getResponseState, COMPLETE, EMPTY } from './completion.js';
+import { resolveScalePoints, findScalePoint } from './scales.js';
 
 /** SCORM 2004 smallest permitted maximums (SPM). */
 export const INTERACTIONS_LIMIT = 250;
@@ -114,24 +118,77 @@ function optionLabels(question, value) {
 }
 
 /**
- * Does the question have a requirement an answer can fail? Mirrors the
- * PARTIAL cases in getResponseState.
+ * Can an answer to this question be wrong? True for the PARTIAL cases in
+ * getResponseState, and for a configured Expected answer.
  * @param {any} question
  */
 export function hasRequirement(question) {
   switch (question.type) {
     case 'checklist':
     case 'multiple_select':
+    case 'single_select':
       return (question.options || []).some((o) => o.expected);
     case 'numeric':
       return !!question.integerOnly || isSet(question.min) || isSet(question.max);
     case 'url':
       return true;
+    case 'yes_no':
+      return YES_NO.includes(question.expectedAnswer);
+    case 'rating':
+      return !!expectedMinPoint(question);
     default:
       return false;
   }
 }
 const isSet = (v) => v !== undefined && v !== null && v !== '';
+const YES_NO = ['yes', 'no'];
+
+/**
+ * Does a (non-empty) answer match the question's Expected answer? null when
+ * the type has no Expected answer configured, so the completion state decides.
+ * @param {any} question
+ * @param {any} value
+ * @returns {boolean|null}
+ */
+export function expectedAnswerMet(question, value) {
+  switch (question.type) {
+    case 'single_select': {
+      const expected = (question.options || []).filter((o) => o.expected).map((o) => String(o.id));
+      return expected.length ? expected.includes(String(value)) : null;
+    }
+    case 'yes_no': {
+      if (!YES_NO.includes(question.expectedAnswer)) return null;
+      const answer = value === true ? 'yes' : value === false ? 'no' : value;
+      return answer === question.expectedAnswer;
+    }
+    case 'rating': {
+      // One points array for both lookups: word scales rank by position in it.
+      const points = resolveScalePoints(question);
+      const min = isSet(question.expectedMin) ? findScalePoint(points, question.expectedMin) : null;
+      if (!min) return null;
+      const chosen = findScalePoint(points, value);
+      return !!chosen && ratingRank(points, chosen) >= ratingRank(points, min);
+    }
+    default:
+      return null;
+  }
+}
+
+/** The scale point named by question.expectedMin, or null. */
+function expectedMinPoint(question) {
+  if (!isSet(question.expectedMin)) return null;
+  return findScalePoint(resolveScalePoints(question), question.expectedMin);
+}
+
+/**
+ * Position of a point on its scale, higher = better. Numeric values compare
+ * as numbers (Strongly Agree = 5 outranks Agree = 4 whatever the listed
+ * order); word values (Low / Medium / High) rank by listed order, low first.
+ */
+export function ratingRank(points, point) {
+  const numeric = points.every((p) => p.value !== '' && isFinite(Number(p.value)));
+  return numeric ? Number(point.value) : points.indexOf(point);
+}
 
 /**
  * @param {any} question
@@ -140,6 +197,9 @@ const isSet = (v) => v !== undefined && v !== null && v !== '';
  */
 export function interactionResult(question, value) {
   if (!hasRequirement(question)) return 'neutral';
+  if (getResponseState(question, value) === EMPTY) return 'incorrect';
+  const met = expectedAnswerMet(question, value);
+  if (met !== null) return met ? 'correct' : 'incorrect';
   return getResponseState(question, value) === COMPLETE ? 'correct' : 'incorrect';
 }
 
