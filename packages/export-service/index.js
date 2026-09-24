@@ -34,7 +34,7 @@ export function listTargets() { return Object.values(TARGETS).map((t) => ({ id: 
  * inlined before the package is built.
  *
  * @param {any} workbook
- * @param {{ target?: string, debug?: boolean, customScales?: any[] }} [opts]
+ * @param {{ target?: string, debug?: boolean, customScales?: any[], now?: Date }} [opts]
  */
 export async function publishWorkbook(workbook, opts = {}) {
   const target = getTarget(opts.target || 'scorm2004');
@@ -53,8 +53,14 @@ export async function publishWorkbook(workbook, opts = {}) {
   const resolved = inlineScales(workbook, customScales);
   const fileMap = await target.buildFileMap(resolved, { debug: !!opts.debug });
   const zip = await zipFileMap(fileMap);
-  const zipName = `${(workbook.courseId || workbook.id || 'observation-workbook')}_SCORM2004.zip`;
+  const zipName = `${(workbook.courseId || workbook.id || 'observation-workbook')}_SCORM2004_${localDate(opts.now || new Date())}.zip`;
   return { zip, zipName, fileMap, report, target: target.id, workbook: resolved };
+}
+
+/** YYYY-MM-DD in local time, so an evening export is not stamped tomorrow. */
+export function localDate(date) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
 /**

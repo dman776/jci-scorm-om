@@ -219,5 +219,12 @@ test('the shipped demo workbook validates and publishes cleanly', async () => {
   assert.equal(res.report.errors.length, 0, JSON.stringify(res.report.errors));
   assert.equal(res.report.warnings.length, 0, JSON.stringify(res.report.warnings));
   assert.ok(res.zip.length > 10000, 'the zip has real content');
-  assert.match(res.zipName, /_SCORM2004\.zip$/);
+  assert.match(res.zipName, /_SCORM2004_\d{4}-\d{2}-\d{2}\.zip$/);
+});
+
+test('the zip name carries the local export date', async () => {
+  // 11pm local on Sep 24: a UTC date would already read Sep 25 west of UTC.
+  const now = new Date(2026, 8, 24, 23, 30);
+  const res = await publishWorkbook(await loadWorkbook(), { customScales: await loadCustomScales(), now });
+  assert.equal(res.zipName, 'ascend-ae-install-ride-along_SCORM2004_2026-09-24.zip');
 });

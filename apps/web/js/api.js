@@ -9,6 +9,11 @@ async function jsonFetch(url, opts) {
 }
 const json = () => ({ 'Content-Type': 'application/json' });
 function filenameFromDisposition(d) { const m = d && /filename="([^"]+)"/.exec(d); return m ? m[1] : null; }
+/** Today as YYYY-MM-DD in local time; the server normally supplies the dated name. */
+function localDate(date = new Date()) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
 
 export const api = {
   listWorkbooks: () => jsonFetch('/api/workbooks'),
@@ -33,6 +38,6 @@ export const api = {
       const body = await res.json().catch(() => ({}));
       const err = new Error(body.error || 'Publish failed'); err.body = body; throw err;
     }
-    return { blob: await res.blob(), filename: filenameFromDisposition(res.headers.get('content-disposition')) || 'workbook_SCORM2004.zip' };
+    return { blob: await res.blob(), filename: filenameFromDisposition(res.headers.get('content-disposition')) || `workbook_SCORM2004_${localDate()}.zip` };
   },
 };

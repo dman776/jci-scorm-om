@@ -25,9 +25,9 @@ npm start            # authoring app at http://127.0.0.1:4173/
 5. **Publish** — validate, then **Build SCORM ZIP**.
 
 ```bash
-npm test                 # 205 tests
+npm test                 # 206 tests
 npm run build:template   # writes samples/template.xlsx
-npm run export:demo      # builds out/<course>_SCORM2004.zip
+npm run export:demo      # builds out/<course>_SCORM2004_<yyyy-mm-dd>.zip
 npm run typecheck        # tsc --noEmit
 npm run test:e2e         # Playwright learner specs (see below)
 ```
@@ -264,7 +264,7 @@ Columns are matched **by header name**, not position, so older templates still i
 ## Tests
 
 ```bash
-npm test    # 205 tests
+npm test    # 206 tests
 ```
 
 | Suite | Covers |
@@ -274,7 +274,7 @@ npm test    # 205 tests
 | `scales.test.js` (22) | built-in definitions, library merge/override, legacy normalization (both traps), resolution, inlining, PDF formatting, validation, the Excel column |
 | `player-dom.test.js` (20) | real `player.js` against a fake DOM: titles without prefix, configurable heading, partial hints, rating layouts, resume-to-dashboard, review rewind, learner name, PDF button |
 | `section-lock.test.js` (20) | the lock rule, editable-until-you-leave, every commit path, write rejection, suspend/resume persistence, v2 payloads, read-only rendering, the authoring warning |
-| `export.test.js` (17) | package structure, **every relative import resolving inside the ZIP**, no workspace imports, manifest completeness, scale inlining, Excel round-trip |
+| `export.test.js` (18) | package structure, **every relative import resolving inside the ZIP**, no workspace imports, manifest completeness, scale inlining, Excel round-trip |
 | `changes.test.js` (13) | whole-workbook PDF download from the header, including the blocked-download fallback |
 | `interactions.test.js` (25) | type mapping, SCORM response formats, text sanitizing and truncation, correct/incorrect, flush-on-navigation, resume without duplicates, locking, the 250 limit, `MockLMS` array rules |
 | `mock-lms-suspend-resume.test.js` (13) | real `SessionCore` against `MockLMS`: suspend/resume, partial persistence, read-only `cmi.learner_name` |
