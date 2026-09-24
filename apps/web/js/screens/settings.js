@@ -67,6 +67,11 @@ export function renderSettings(mount, { store }) {
         h('input', { type: 'checkbox', checked: !!wb.settings.reportSuccess, onchange: (e) => store.update(() => { wb.settings.reportSuccess = e.target.checked; }) }),
         h('span', 'Also report cmi.success_status (most observation workbooks report completion only)'),
       ]),
+      h('label.check-row', [
+        h('input', { type: 'checkbox', checked: wb.settings.reportInteractions !== false, onchange: (e) => store.update(() => { wb.settings.reportInteractions = e.target.checked; }) }),
+        h('span', 'Report each answer to the LMS as a cmi.interactions entry'),
+      ]),
+      h('p.field-hint', 'Lets LMS reports show every question with the learner\u2019s answer and whether it met its requirement. Free-text answers become visible in LMS reporting. Turn off for workbooks with sensitive free text.'),
     ]),
   ]));
 }

@@ -6,6 +6,7 @@
 import {
   QUESTION_TYPES, SUSPEND_DATA_LIMIT, SUSPEND_DATA_WARN_RATIO, EXPECTED_GATED_TYPES,
 } from '@sowb/shared/constants.js';
+import { isSafeIdentifier, INTERACTIONS_LIMIT } from './interactions.js';
 import { buildScaleIndex, resolveScalePoints, CUSTOM_SCALE_ID } from '@sowb/shared/scales.js';
 
 const CHOICE_TYPES = ['single_select', 'multiple_select', 'checklist'];
@@ -44,6 +45,7 @@ export function validateWorkbook(workbook, opts = {}) {
     errors.push({ code: 'no-required-section', message: 'Workbook has no required sections, so completion can never be reached.' });
   }
 
+  const reportInteractions = !workbook.settings || workbook.settings.reportInteractions !== false;
   const seenQuestionIds = new Set();
   for (const section of sections) {
     const questions = section.questions || [];
@@ -151,6 +153,23 @@ export function validateWorkbook(workbook, opts = {}) {
       if (q.type === 'evidence_ref' && q.storeFileInScorm) {
         errors.push({ code: 'evidence-stores-file', message: `Evidence question "${q.id}" is configured to store a file in SCORM. Evidence questions may record metadata only.`, ref: q.id });
       }
+      // ---- cmi.interactions identifiers ----
+      // Question ids, option ids, and rating values are written to the LMS as
+      // identifiers; anything outside the safe set may be rejected there.
+      if (reportInteractions) {
+        const unsafe = [q.id];
+        if (CHOICE_TYPES.includes(q.type)) unsafe.push(...(q.options || []).map((o) => o.id));
+        if (q.type === 'rating') unsafe.push(...resolveScalePoints(q, scaleIndex).map((p) => p.value));
+        const bad = unsafe.filter((v) => v !== undefined && !isSafeIdentifier(v));
+        if (bad.length) {
+          warnings.push({
+            code: 'interaction-bad-identifier',
+            message: `Question "${q.id}" reports ${bad.map((v) => `"${v}"`).join(', ')} to the LMS, which may reject it. Use only letters, numbers, and . _ ~ : -`,
+            ref: q.id,
+          });
+        }
+      }
+
       if ((CHOICE_TYPES.includes(q.type) || q.type === 'evidence_ref') && !(q.helpText && q.helpText.trim())) {
         warnings.push({ code: 'missing-help-text', message: `Question "${q.id}" is a complex item with no help text.`, ref: q.id });
       }
@@ -159,6 +178,13 @@ export function validateWorkbook(workbook, opts = {}) {
 
   if (workbook.settings && workbook.settings.navigation === 'linear' && sections.length > 0 && !sections.some((s) => s.required)) {
     warnings.push({ code: 'linear-no-completion', message: 'Linear navigation has no completion-eligible required section reachable.' });
+  }
+
+  if (reportInteractions && seenQuestionIds.size > INTERACTIONS_LIMIT) {
+    warnings.push({
+      code: 'interactions-over-limit',
+      message: `Workbook has ${seenQuestionIds.size} questions, but SCORM 2004 only guarantees ${INTERACTIONS_LIMIT} interactions. Answers past that limit are kept for resume but not reported to the LMS.`,
+    });
   }
 
   const size = opts.estimatedSuspendSize || 0;

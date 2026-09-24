@@ -56,6 +56,7 @@ export const DEFAULT_SETTINGS = Object.freeze({
   navigation: NAVIGATION.FREE,
   completionRule: COMPLETION_RULE.ALL_REQUIRED,
   reportSuccess: false,
+  reportInteractions: true,
   dashboardHeading: DEFAULT_DASHBOARD_HEADING,
   allowPdfDownload: true,
 });

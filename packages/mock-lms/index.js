@@ -4,6 +4,10 @@
  * surface. Persists cmi state across "sessions" so tests can simulate the exact
  * suspend -> close -> relaunch -> resume cycle a real LMS performs.
  *
+ * cmi.interactions follows the spec's array rules strictly, so a SCO that
+ * skips an index (351) or writes a field before its id (408) fails here the
+ * way it would in a real LMS.
+ *
  * Usage:
  *   const lms = new MockLMS();
  *   const api = lms.newAttempt();   // first launch -> cmi.entry = 'ab-initio'
@@ -65,17 +69,22 @@ export class MockLMS {
       GetValue(el) {
         if (!initialized) { lastError = '122'; return ''; }
         lastError = '0';
+        const count = COUNT_RE.exec(el);
+        if (count) return String(countEntries(session, count[1]));
         return session[el] !== undefined ? String(session[el]) : '';
       },
       SetValue(el, v) {
         if (!initialized) { lastError = '132'; return 'false'; }
-        if (READ_ONLY.has(el)) { lastError = '404'; return 'false'; }
+        if (READ_ONLY.has(el) || COUNT_RE.test(el)) { lastError = '404'; return 'false'; }
+        const err = arrayOrderError(session, el);
+        if (err) { lastError = err; return 'false'; }
         session[el] = String(v); lastError = '0'; return 'true';
       },
       Commit(p) {
         if (p !== '' && p !== undefined) { lastError = '201'; return 'false'; }
         if (!initialized) { lastError = '142'; return 'false'; }
         for (const k of PERSISTED_KEYS) if (session[k] !== undefined) self.persistent[k] = session[k];
+        for (const k of Object.keys(session)) if (k.startsWith('cmi.interactions.')) self.persistent[k] = session[k];
         self.commitLog.push(JSON.stringify({ ...self.persistent }));
         lastError = '0'; return 'true';
       },
@@ -89,6 +98,48 @@ export class MockLMS {
 
   /** Snapshot of persistent LMS state (what a real LMS would store). */
   snapshot() { return { ...this.persistent, launchCount: this.launchCount }; }
+
+  /** Committed interactions as objects, in index order. */
+  interactions() {
+    const out = [];
+    for (let n = 0; this.persistent[`cmi.interactions.${n}.id`] !== undefined; n++) {
+      const prefix = `cmi.interactions.${n}.`;
+      const entry = {};
+      for (const [k, v] of Object.entries(this.persistent)) if (k.startsWith(prefix)) entry[k.slice(prefix.length)] = v;
+      out.push(entry);
+    }
+    return out;
+  }
+}
+
+const COUNT_RE = /^(cmi\.interactions(?:\.\d+\.objectives)?)\._count$/;
+
+/** Entries in a data-model array: each one exists once its id is set. */
+function countEntries(data, base) {
+  let n = 0;
+  while (data[`${base}.${n}.id`] !== undefined) n++;
+  return n;
+}
+
+/**
+ * SCORM 2004 array rules for cmi.interactions (and its objectives): a new
+ * entry must be created at index _count, and by setting its id first.
+ * @returns {string} error code, or '' when the write is allowed
+ */
+function arrayOrderError(data, el) {
+  const m = /^cmi\.interactions\.(\d+)\.(.+)$/.exec(el);
+  if (!m) return '';
+  const n = Number(m[1]);
+  const count = countEntries(data, 'cmi.interactions');
+  if (n > count) return '351';
+  if (n === count && m[2] !== 'id') return '408';
+  const obj = /^objectives\.(\d+)\.(.+)$/.exec(m[2]);
+  if (obj) {
+    const oc = countEntries(data, `cmi.interactions.${n}.objectives`);
+    if (Number(obj[1]) > oc) return '351';
+    if (Number(obj[1]) === oc && obj[2] !== 'id') return '408';
+  }
+  return '';
 }
 
 const READ_ONLY = new Set(['cmi.entry', 'cmi.total_time', 'cmi.learner_name', 'cmi.learner_id',
@@ -99,7 +150,8 @@ const ERROR_STRINGS = {
   '0': 'No error', '101': 'General exception', '103': 'Already initialized',
   '112': 'Termination before initialization', '122': 'Retrieve data before initialization',
   '132': 'Store data before initialization', '142': 'Commit before initialization',
-  '201': 'General argument error', '404': 'Data model element is read only',
+  '201': 'General argument error', '351': 'General set failure',
+  '404': 'Data model element is read only', '408': 'Data model dependency not established',
 };
 
 /** Add two ISO 8601 PTnHnMnS durations. */

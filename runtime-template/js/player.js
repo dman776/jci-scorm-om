@@ -16,6 +16,7 @@ import {
   COMPLETE, PARTIAL,
   COMPLETED, IN_PROGRESS, PARTIALLY_COMPLETE, NOT_STARTED,
 } from './engine/completion.js';
+import { FILL_IN_LIMIT } from './engine/interactions.js';
 
 const STATUS_LABEL = {
   [COMPLETED]: 'Completed',
@@ -433,7 +434,9 @@ export class WorkbookPlayer {
     switch (q.type) {
       case 'short_text': {
         const i = el('input', 'sowb-text');
-        i.type = 'text'; i.value = value || '';
+        // 250 is the SCORM fill-in interaction limit, so the LMS report
+        // always holds the whole answer.
+        i.type = 'text'; i.value = value || ''; i.maxLength = FILL_IN_LIMIT;
         i.setAttribute('aria-labelledby', lb);
         i.setAttribute('data-q', q.id);
         i.addEventListener('input', () => this.setResponse(q.id, i.value));
@@ -630,6 +633,7 @@ export class WorkbookPlayer {
       'location:          ' + this.adapter.getValue('cmi.location'),
       'entry:             ' + this.adapter.getValue('cmi.entry'),
       'suspend bytes:     ' + this.session.suspendBytes(),
+      'interactions:      ' + this.session.interactionCount(),
       '',
       'recent API calls:',
       this.adapter.log.slice(-12).join('\n'),

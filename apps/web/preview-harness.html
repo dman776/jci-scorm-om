@@ -65,6 +65,7 @@
         'cmi.suspend_data': '', 'cmi.exit': '', 'cmi.location': '',
         'cmi.completion_status': 'unknown', 'cmi.progress_measure': '',
       });
+      for (const k of Object.keys(lms.persistent)) if (k.startsWith('cmi.interactions.')) delete lms.persistent[k];
       launch();
     });
     debugToggle.addEventListener('change', () => { if (player) { player.debug = debugToggle.checked; player.render(); } });

@@ -59,7 +59,10 @@ export function createFallbackAPI(storageKey = 'sowb.fallback') {
     __fallback: true,
     Initialize() { return 'true'; },
     Terminate() { persist(); return 'true'; },
-    GetValue(el) { return data[el] !== undefined ? data[el] : ''; },
+    GetValue(el) {
+      if (el === 'cmi.interactions._count') return String(countInteractions(data));
+      return data[el] !== undefined ? data[el] : '';
+    },
     SetValue(el, v) { data[el] = String(v); return 'true'; },
     Commit() { persist(); return 'true'; },
     GetLastError() { return '0'; },
@@ -67,6 +70,13 @@ export function createFallbackAPI(storageKey = 'sowb.fallback') {
     GetDiagnostic() { return ''; },
     _dump() { return { ...data }; },
   };
+}
+
+/** Number of interactions created so far (each one starts with its id). */
+function countInteractions(data) {
+  let n = 0;
+  while (data[`cmi.interactions.${n}.id`] !== undefined) n++;
+  return n;
 }
 
 /** High-level wrapper around whichever API (real LMS or fallback) is in play. */

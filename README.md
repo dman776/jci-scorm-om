@@ -25,7 +25,7 @@ npm start            # authoring app at http://127.0.0.1:4173/
 5. **Publish** — validate, then **Build SCORM ZIP**.
 
 ```bash
-npm test                 # 180 tests
+npm test                 # 198 tests
 npm run build:template   # writes samples/template.xlsx
 npm run export:demo      # builds out/<course>_SCORM2004.zip
 npm run typecheck        # tsc --noEmit
@@ -174,13 +174,38 @@ Two guardrails worth knowing:
 
 ---
 
+## LMS reporting (cmi.interactions)
+
+Each answer is also reported as a `cmi.interactions` entry so LMS reports can show question-by-question results. This is **report-only**: `cmi.suspend_data` stays the source of truth for resume, and interactions are never read back into learner state. Turn it off per workbook in Settings → *Report each answer to the LMS* (`settings.reportInteractions`, on by default).
+
+| Question type | `type` | `learner_response` |
+|---|---|---|
+| Yes / No, Acknowledgement | `true-false` | `true` / `false` |
+| Single select, Multiple select, Checklist | `choice` | option ids, joined with `[,]` |
+| Rating | `likert` | the scale **value** (never the label) |
+| Numeric | `numeric` | the number |
+| Short text, Date, Evidence (file name) | `fill-in` | the text (≤ 250 characters) |
+| Long text, URL | `long-fill-in` | the text (≤ 4000 characters) |
+
+Each entry also carries `id` (the question id), `description` (the prompt, ≤ 250 characters), `objectives.0.id` (the section id), `timestamp`, and `result`: **`correct`** when the answer satisfies its question, **`incorrect`** when it is partial (numeric out of range, checklist missing an expected option, malformed url) or cleared. `correct_responses` is never written, because a checklist allows extra selections and the SCORM `choice` pattern demands an exact match.
+
+Things worth knowing:
+
+- **Written on navigation, not per keystroke.** Answers are flushed on Next / Back / section change / exit. Some LMSs journal every interaction write, and typing would otherwise fill the report with partial answers.
+- **Short text is capped at 250 characters** in the runtime, the SCORM `fill-in` limit, so the LMS always holds the whole answer. Long text over 4000 characters is truncated in the report only; the full text stays in suspend data.
+- **Interactions cannot be deleted.** A blank answer never creates one; clearing an answer that was already reported overwrites it with an empty response and `incorrect`. A cleared numeric keeps its last value, since an empty value is not a valid number.
+- **SCORM guarantees 250 interactions.** Validation warns above that (`interactions-over-limit`); later answers are still saved for resume but not reported.
+- **Identifiers must be LMS-safe.** Question ids, option ids, and rating values are written as identifiers. Validation warns (`interaction-bad-identifier`) on anything outside letters, numbers, and `. _ ~ : -`, such as a custom scale value `Strongly Agree`.
+
+---
+
 ## Monorepo layout
 
 ```
 scorm-om/
 ├─ packages/
 │  ├─ shared/                   # constants, ids, JSDoc types, rating scale library
-│  ├─ workbook-engine/          # response/section states, validation, suspend serialization
+│  ├─ workbook-engine/          # response/section states, validation, suspend serialization, cmi.interactions mapping
 │  ├─ scorm-runtime/            # assembleRuntime(): the file set for preview AND export
 │  ├─ export-service/           # export-target registry, manifest.js, packager.js (jszip)
 │  ├─ mock-lms/                 # headless SCORM 2004 API_1484_11 for tests + preview
@@ -222,7 +247,7 @@ Columns are matched **by header name**, not position, so older templates still i
 ## Tests
 
 ```bash
-npm test    # 180 tests
+npm test    # 198 tests
 ```
 
 | Suite | Covers |
@@ -234,6 +259,7 @@ npm test    # 180 tests
 | `section-lock.test.js` (20) | the lock rule, editable-until-you-leave, every commit path, write rejection, suspend/resume persistence, v2 payloads, read-only rendering, the authoring warning |
 | `export.test.js` (17) | package structure, **every relative import resolving inside the ZIP**, no workspace imports, manifest completeness, scale inlining, Excel round-trip |
 | `changes.test.js` (13) | whole-workbook PDF download from the header, including the blocked-download fallback |
+| `interactions.test.js` (18) | type mapping, SCORM response formats, text sanitizing and truncation, correct/incorrect, flush-on-navigation, resume without duplicates, locking, the 250 limit, `MockLMS` array rules |
 | `mock-lms-suspend-resume.test.js` (13) | real `SessionCore` against `MockLMS`: suspend/resume, partial persistence, read-only `cmi.learner_name` |
 | `wiring.test.js` (10) | the shipped package renders labeled scales, stores values not labels, and keeps legacy inline scales working |
 | `scale-excel.test.js` (6) | the Questions sheet `Rating Scale` column: ids, names, explicit points, bare labels, round-trip |

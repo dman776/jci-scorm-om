@@ -8,6 +8,7 @@
     "./completion.js": "./completion.js",
     "./validation.js": "./validation.js",
     "./suspend.js": "./suspend.js",
+    "./interactions.js": "./interactions.js",
     "./scales.js": "./scales.js"
   }
 }
