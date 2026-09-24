@@ -20,6 +20,8 @@ const SCREENS = {
   help: { label: 'Help & Guide', icon: 'help', render: renderHelp },
 };
 let current = 'editor';
+/** App version from the server, fetched once; '' until it arrives. */
+let appVersion = '';
 
 function navigate(screen) {
   if (!SCREENS[screen]) screen = 'editor';
@@ -59,7 +61,10 @@ function renderSidebar() {
     h('button.nav-item' + (key === current ? '.active' : ''), { onclick: () => navigate(key) },
       [h('span.nav-ico.ico-' + s.icon), s.label]));
   // A small, discrete build credit pinned to the bottom of the nav pane.
-  return h('nav.sidebar', [h('div.nav-items', items), h('div.sidebar-credit', 'Built by Darryl Quinn')]);
+  return h('nav.sidebar', [h('div.nav-items', items), h('div.sidebar-credit', [
+    h('div', 'Built by Darryl Quinn'),
+    h('div.sidebar-version', appVersion ? 'v' + appVersion : ''),
+  ])]);
 }
 
 async function onSave() {
@@ -86,3 +91,8 @@ window.addEventListener('hashchange', () => {
 const initial = location.hash.replace('#', '');
 if (SCREENS[initial]) current = initial;
 renderShell();
+api.getVersion().then(({ version }) => {
+  appVersion = version;
+  const el = document.querySelector('.sidebar-version');
+  if (el) el.textContent = 'v' + version;
+}).catch(() => { /* the credit simply shows no version */ });

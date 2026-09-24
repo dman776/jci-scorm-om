@@ -23,6 +23,7 @@ export const api = {
   deleteWorkbook: (id) => jsonFetch('/api/workbooks/' + encodeURIComponent(id), { method: 'DELETE' }),
 
   listScales: () => jsonFetch('/api/scales'),
+  getVersion: () => jsonFetch('/api/version'),
   saveScale: (s) => jsonFetch('/api/scales', { method: 'POST', headers: json(), body: JSON.stringify(s) }),
   deleteScale: (id) => jsonFetch('/api/scales/' + encodeURIComponent(id), { method: 'DELETE' }),
   scaleUsage: (id) => jsonFetch('/api/scales/' + encodeURIComponent(id) + '/usage'),

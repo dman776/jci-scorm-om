@@ -54,6 +54,7 @@ a { color: var(--blue-2); }
   text-align: center;
   letter-spacing: .2px;
 }
+.sidebar-version { margin-top: 2px; font-size: 10px; font-variant-numeric: tabular-nums; }
 
 .content { flex: 1; overflow: auto; padding: 24px; }
 

@@ -27,6 +27,8 @@ const WEB_DIR = join(ROOT, 'apps', 'web');
 const MOCK_LMS_FILE = join(ROOT, 'packages', 'mock-lms', 'index.js');
 const PORT = process.env.PORT || 4173;
 const HOST = process.env.HOST || '127.0.0.1';
+/** App version, from the root package.json: the single source of truth. */
+const APP_VERSION = JSON.parse(await readFile(join(ROOT, 'package.json'), 'utf8')).version;
 
 /** In-memory workbook currently loaded into the Preview (scales already inlined). */
 let previewWorkbook = null;
@@ -89,6 +91,7 @@ async function handleApi(req, res, path, url) {
   }
 
   if (path === '/api/targets' && req.method === 'GET') return sendJson(res, 200, listTargets());
+  if (path === '/api/version' && req.method === 'GET') return sendJson(res, 200, { version: APP_VERSION });
 
   // ---- publish ----
   if (path === '/api/publish' && req.method === 'POST') {
