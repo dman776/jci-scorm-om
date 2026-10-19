@@ -29,11 +29,13 @@ export async function renderLibrary(mount, { store, api, navigate }) {
       listEl.appendChild(h('ul.lib-items', items.map((w) => h('li.lib-item', [
         h('div.lib-item-main', [
           h('span.lib-name', w.title),
-          h('span.lib-meta', `v${w.version} \u00b7 ${w.sections} section${w.sections === 1 ? '' : 's'} \u00b7 ${w.id}`),
+          h('span.lib-meta', w.unreadable ? `${w.file} \u00b7 not a readable workbook` : `v${w.version} \u00b7 ${w.sections} section${w.sections === 1 ? '' : 's'} \u00b7 ${w.file}`),
         ]),
         h('div.lib-item-actions', [
-          h('button.btn.small', { onclick: () => onOpen(w.id) }, 'Open'),
-          h('button.btn.small.ghost', { onclick: () => onDelete(w.id) }, 'Delete'),
+          w.unreadable ? null : h('button.btn.small', { onclick: () => onOpen(w.file) }, 'Open'),
+          w.unreadable ? null : h('button.btn.small.ghost', { onclick: () => onClone(w.file) }, 'Clone'),
+          h('button.btn.small.ghost', { title: 'Rename the file', onclick: () => onRename(w.file) }, 'Rename'),
+          h('button.btn.small.ghost', { onclick: () => onDelete(w.file) }, 'Delete'),
         ]),
       ]))));
     } catch (err) {
@@ -47,16 +49,34 @@ export async function renderLibrary(mount, { store, api, navigate }) {
     toast('New workbook created', 'success');
     navigate('settings');
   }
-  async function onOpen(id) {
+  async function onRename(file) {
+    const entered = window.prompt('New file name (without .json):', file.replace(/\.json$/, ''));
+    if (entered === null) return;
+    try {
+      const { file: renamed } = await api.renameWorkbook(file, entered);
+      if (store.file === file) store.setFile(renamed);
+      toast('Renamed to ' + renamed, 'success');
+      await refreshList();
+    } catch (err) { toast('Rename failed: ' + err.message, 'error'); }
+  }
+  async function onClone(file) {
+    try {
+      const copy = await api.cloneWorkbook(file);
+      toast('Cloned as ' + copy.workbook.title, 'success');
+      await refreshList();
+    } catch (err) { toast('Clone failed: ' + err.message, 'error'); }
+  }
+  async function onOpen(file) {
     if (store.dirty && !(await confirmDialog('Open another workbook? Unsaved changes will be lost.'))) return;
-    const wb = await api.getWorkbook(id);
-    store.set(wb); store.markSaved();
+    const wb = await api.getWorkbook(file);
+    store.set(wb); store.setFile(file); store.markSaved();
     toast('Opened ' + wb.title, 'success');
     navigate('editor');
   }
-  async function onDelete(id) {
+  async function onDelete(file) {
     if (!(await confirmDialog('Delete this saved workbook? This cannot be undone.'))) return;
-    await api.deleteWorkbook(id);
+    await api.deleteWorkbook(file);
+    if (store.file === file) store.setFile(null);
     toast('Deleted', 'info');
     await refreshList();
   }

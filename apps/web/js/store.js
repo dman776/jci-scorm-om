@@ -7,18 +7,24 @@
 import { newSectionId, newQuestionId, newOptionId } from './ids-browser.js';
 
 const LS_KEY = 'sowb.currentWorkbook';
+const LS_FILE_KEY = 'sowb.currentFile';
 
 class Store {
   constructor() {
     this.workbook = migrate(this._load() || blank());
+    /** Library file this workbook was opened from / last saved to; null when never saved. */
+    this.file = this._loadFile();
     this.dirty = false;
     this.subs = new Set();
   }
   subscribe(fn) { this.subs.add(fn); return () => this.subs.delete(fn); }
   _emit() { for (const fn of this.subs) fn(this.workbook); }
   _load() { try { const raw = localStorage.getItem(LS_KEY); return raw ? JSON.parse(raw) : null; } catch { return null; } }
+  _loadFile() { try { return localStorage.getItem(LS_FILE_KEY) || null; } catch { return null; } }
+  setFile(file) { this.file = file || null; try { if (file) localStorage.setItem(LS_FILE_KEY, file); else localStorage.removeItem(LS_FILE_KEY); } catch { /* ignore */ } }
   persist() { try { localStorage.setItem(LS_KEY, JSON.stringify(this.workbook)); } catch { /* ignore */ } }
-  set(workbook) { this.workbook = migrate(workbook); this.dirty = true; this.persist(); this._emit(); }
+  /** Replace the workbook with one that has no library file yet (new / imported). */
+  set(workbook) { this.setFile(null); this.workbook = migrate(workbook); this.dirty = true; this.persist(); this._emit(); }
   update(mutator) { mutator(this.workbook); this.dirty = true; this.persist(); this._emit(); }
   markSaved() { this.dirty = false; }
   hasContent() {

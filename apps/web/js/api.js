@@ -19,7 +19,9 @@ export const api = {
   listWorkbooks: () => jsonFetch('/api/workbooks'),
   getWorkbook: (id) => jsonFetch('/api/workbooks/' + encodeURIComponent(id)),
   newWorkbook: () => jsonFetch('/api/workbooks/new'),
-  saveWorkbook: (wb) => jsonFetch('/api/workbooks', { method: 'POST', headers: json(), body: JSON.stringify(wb) }),
+  saveWorkbook: (wb, file) => jsonFetch('/api/workbooks' + (file ? '?file=' + encodeURIComponent(file) : ''), { method: 'POST', headers: json(), body: JSON.stringify(wb) }),
+  cloneWorkbook: (file) => jsonFetch('/api/workbooks/' + encodeURIComponent(file) + '/clone', { method: 'POST' }),
+  renameWorkbook: (file, name) => jsonFetch('/api/workbooks/' + encodeURIComponent(file) + '/rename', { method: 'POST', headers: json(), body: JSON.stringify({ name }) }),
   deleteWorkbook: (id) => jsonFetch('/api/workbooks/' + encodeURIComponent(id), { method: 'DELETE' }),
 
   listScales: () => jsonFetch('/api/scales'),

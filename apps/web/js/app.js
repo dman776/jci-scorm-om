@@ -69,8 +69,9 @@ function renderSidebar() {
 
 async function onSave() {
   try {
-    const saved = await api.saveWorkbook(store.workbook);
-    store.update((wb) => { wb.id = saved.id; });
+    const saved = await api.saveWorkbook(store.workbook, store.file);
+    store.setFile(saved.file);
+    store.update((wb) => { wb.id = saved.workbook.id; });
     store.markSaved();
     toast('Workbook saved', 'success');
     renderShell();

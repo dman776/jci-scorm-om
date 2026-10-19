@@ -19,7 +19,7 @@ import { validateWorkbook, estimateWorstCaseSuspend, publishWorkbook, listTarget
 import { assembleRuntime } from '@sowb/scorm-runtime';
 import { buildTemplateXlsx, importWorkbookXlsx } from '@sowb/excel-io/workbook-xlsx.js';
 
-import { listWorkbooks, readAllWorkbooks, getWorkbook, saveWorkbook, deleteWorkbook } from './store.js';
+import { listWorkbooks, readAllWorkbooks, getWorkbook, saveWorkbook, cloneWorkbook, renameWorkbook, deleteWorkbook } from './store.js';
 import { listCustomScales, listAllScales, saveScale, deleteScale, findScaleUsage } from './scales-store.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -51,8 +51,24 @@ const server = http.createServer(async (req, res) => {
 async function handleApi(req, res, path, url) {
   // ---- workbooks ----
   if (path === '/api/workbooks' && req.method === 'GET') return sendJson(res, 200, await listWorkbooks());
-  if (path === '/api/workbooks' && req.method === 'POST') return sendJson(res, 200, await saveWorkbook(await readBodyJson(req)));
+  if (path === '/api/workbooks' && req.method === 'POST') return sendJson(res, 200, await saveWorkbook(await readBodyJson(req), url.searchParams.get('file') || undefined));
   if (path === '/api/workbooks/new' && req.method === 'GET') return sendJson(res, 200, blankWorkbook());
+
+  const cloneMatch = /^\/api\/workbooks\/([^/]+)\/clone$/.exec(path);
+  if (cloneMatch && req.method === 'POST') {
+    const copy = await cloneWorkbook(cloneMatch[1]);
+    return copy ? sendJson(res, 200, copy) : sendJson(res, 404, { error: 'Not found' });
+  }
+
+  const renameMatch = /^\/api\/workbooks\/([^/]+)\/rename$/.exec(path);
+  if (renameMatch && req.method === 'POST') {
+    try {
+      const { name } = await readBodyJson(req);
+      return sendJson(res, 200, { file: await renameWorkbook(renameMatch[1], name) });
+    } catch (err) {
+      return sendJson(res, err.status || 500, { error: err.message });
+    }
+  }
 
   const wbMatch = /^\/api\/workbooks\/([^/]+)$/.exec(path);
   if (wbMatch) {
