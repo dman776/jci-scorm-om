@@ -21,6 +21,17 @@ export function renderRatingEditor(q, store, rerender, scaleLibrary) {
   const points = resolveScalePoints(q, index);
   const missing = q.scaleId && q.scaleId !== CUSTOM_SCALE_ID && !index[q.scaleId];
 
+  // Typing in the point/caption inputs must not rerender (it would drop focus),
+  // so the preview is swapped in place instead.
+  const previewHost = h('div.preview-host');
+  const refreshPreview = () => {
+    previewHost.innerHTML = '';
+    const pts = resolveScalePoints(q, index);
+    const node = renderPreview(pts, q);
+    if (node) previewHost.appendChild(node);
+  };
+  refreshPreview();
+
   return h('div.rating-block', [
     h('span.field-label', 'Rating scale'),
     h('label.field', [
@@ -38,7 +49,7 @@ export function renderRatingEditor(q, store, rerender, scaleLibrary) {
 
     missing ? h('p.block-error', `This question references "${q.scaleId}", which is no longer in the library. Pick another scale, or it will block export.`) : null,
 
-    usingCustom ? renderCustomPoints(q, store, rerender) : null,
+    usingCustom ? renderCustomPoints(q, store, rerender, refreshPreview) : null,
 
     // Anchor captions only make sense when the points themselves are terse.
     points.length && points.every((p) => String(p.label).length <= 3)
@@ -48,11 +59,11 @@ export function renderRatingEditor(q, store, rerender, scaleLibrary) {
           h('div.grid-2', [
             h('label.field', [
               h('span.field-label', 'Low end'),
-              h('input', { type: 'text', value: q.minLabel || '', oninput: (e) => store.update(() => { q.minLabel = e.target.value; }) }),
+              h('input', { type: 'text', value: q.minLabel || '', oninput: (e) => { store.update(() => { q.minLabel = e.target.value; }); refreshPreview(); } }),
             ]),
             h('label.field', [
               h('span.field-label', 'High end'),
-              h('input', { type: 'text', value: q.maxLabel || '', oninput: (e) => store.update(() => { q.maxLabel = e.target.value; }) }),
+              h('input', { type: 'text', value: q.maxLabel || '', oninput: (e) => { store.update(() => { q.maxLabel = e.target.value; }); refreshPreview(); } }),
             ]),
           ]),
         ])
@@ -60,7 +71,7 @@ export function renderRatingEditor(q, store, rerender, scaleLibrary) {
 
     renderExpected(q, points, store, rerender),
 
-    renderPreview(points, q),
+    previewHost,
   ]);
 }
 
@@ -95,7 +106,7 @@ function renderExpected(q, points, store, rerender) {
   ]);
 }
 
-function renderCustomPoints(q, store, rerender) {
+function renderCustomPoints(q, store, rerender, refreshPreview) {
   if (!Array.isArray(q.scale) || !q.scale.length) {
     q.scale = [{ value: 1, label: '' }, { value: 2, label: '' }];
   }
@@ -104,9 +115,9 @@ function renderCustomPoints(q, store, rerender) {
     h('p.field-hint', 'VALUE is stored in the LMS; LABEL is what the learner reads.'),
     h('div.point-rows', points.map((p, i) => h('div.point-row', [
       h('input.point-value', { type: 'text', value: String(p.value), title: 'Stored value',
-        oninput: (e) => store.update(() => { q.scale[i] = { ...points[i], value: coerce(e.target.value) }; }) }),
+        oninput: (e) => { store.update(() => { q.scale[i] = { ...points[i], value: coerce(e.target.value) }; }); refreshPreview(); } }),
       h('input.point-label', { type: 'text', value: p.label, placeholder: 'Label',
-        oninput: (e) => store.update(() => { q.scale[i] = { ...points[i], label: e.target.value }; }) }),
+        oninput: (e) => { store.update(() => { q.scale[i] = { ...points[i], label: e.target.value }; }); refreshPreview(); } }),
       h('button.icon-btn', { title: 'Remove point',
         onclick: () => { store.update(() => { q.scale = points.filter((_, j) => j !== i); }); rerender(); } }, '\u2715'),
     ]))),
@@ -116,17 +127,24 @@ function renderCustomPoints(q, store, rerender) {
   ]);
 }
 
-/** Live preview so the author sees the learner's view without leaving the editor. */
-function renderPreview(points, q) {
-  if (!points.length) return null;
+/** Live preview so the author sees the learner's slider without leaving the editor. */
+function renderPreview(unordered, q) {
+  if (!unordered.length) return null;
+  // Same order as the learner slider: lowest left, highest right.
+  const numeric = unordered.every((p) => p.value !== '' && isFinite(Number(p.value)));
+  const points = numeric ? [...unordered].sort((a, b) => Number(a.value) - Number(b.value)) : unordered;
   const compact = points.every((p) => String(p.label).length <= 3);
+  const last = points.length - 1;
   return h('div.scale-preview', [
     h('span.field-label', 'Learner preview'),
-    h('div.preview-body' + (compact ? '.compact' : '.listed'),
-      points.map((p) => h('span.preview-point', [
-        h('span.preview-value', String(p.value)),
-        String(p.label) === String(p.value) ? null : h('span.preview-label', p.label),
-      ]))),
+    h('div.preview-body' + (compact ? '.compact' : '.listed'), [
+      h('input.preview-range', { type: 'range', min: 0, max: last, step: 1, value: Math.floor(last / 2), 'aria-label': 'Preview slider' }),
+      h('div.preview-ticks', { style: `--last:${Math.max(last, 1)}` },
+        points.map((p, i) => h('span.preview-stop', { style: `--f:${last ? i / last : 0.5}` }, [
+          h('span.preview-tick'),
+          h('span.preview-label', String(p.label)),
+        ]))),
+    ]),
     compact && (q.minLabel || q.maxLabel)
       ? h('div.preview-anchors', [h('span', q.minLabel || ''), h('span', q.maxLabel || '')])
       : null,

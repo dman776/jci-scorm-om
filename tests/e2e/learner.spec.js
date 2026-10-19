@@ -77,7 +77,8 @@ test('a labeled rating scale renders its wording and stores the value', async ({
 
   await expect(page.locator('[data-rating-layout]')).toHaveAttribute('data-rating-layout', 'listed');
   await expect(page.locator('.sowb-rating-label').first()).toHaveText('Strongly Agree');
-  await page.locator('[data-q="q_s2_3"][data-value="2"]').check();
+  await page.locator('input[type="range"][data-q="q_s2_3"]').focus();
+  await page.keyboard.press('ArrowLeft'); // starts at the middle (3); one step left => value 2
   await expect(page.locator('[data-answer-status]')).toHaveText('Answer saved');
 
   const stored = await page.evaluate(() => window.__PLAYER__.state.responses.q_s2_3);

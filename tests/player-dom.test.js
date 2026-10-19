@@ -128,13 +128,16 @@ test('a labeled scale renders its wording, not bare numbers', () => {
   player.openSection('s2');
   player.state.currentPage = 2; // agreement-5
   player.render();
+  // Every stop is ticked and labelled.
   assert.deepEqual(
     mount.querySelectorAll('.sowb-rating-label').map((n) => n.textContent),
-    ['Strongly Agree', 'Agree', 'Neutral', 'Disagree', 'Strongly Disagree']
+    ['Strongly Disagree', 'Disagree', 'Neutral', 'Agree', 'Strongly Agree']
   );
+  assert.equal(mount.querySelectorAll('.sowb-rating-tick').length, 5);
   assert.equal(mount.querySelector('[data-rating-layout]').getAttribute('data-rating-layout'), 'listed');
-  // The value badge accompanies the wording. 5 = Strongly Agree.
-  assert.deepEqual(mount.querySelectorAll('.sowb-rating-value').map((n) => n.textContent), ['5', '4', '3', '2', '1']);
+  const slider = mount.querySelector('[data-q="q_s2_3"]');
+  assert.equal(slider.type, 'range');
+  assert.equal(slider.max, '4');
 });
 
 test('a short-labeled scale renders as compact chips with end captions', () => {
@@ -151,9 +154,10 @@ test('rating stores the scale VALUE, never the label', () => {
   player.openSection('s2');
   player.state.currentPage = 2;
   player.render();
-  const radios = mount.querySelectorAll('[data-q="q_s2_3"]');
-  assert.deepEqual(radios.map((r) => r.value), ['5', '4', '3', '2', '1']);
-  radios[1].dispatch('change');
+  const slider = mount.querySelector('[data-q="q_s2_3"]');
+  assert.equal(player.state.responses.q_s2_3 || '', '', 'untouched slider stores nothing');
+  slider.value = '3'; // index 3 of 1,2,3,4,5 => value 4
+  slider.dispatch('input');
   assert.equal(player.state.responses.q_s2_3, '4');
   assert.ok(!lms.snapshot()['cmi.suspend_data'].includes('Agree'), 'labels never reach suspend data');
 });
@@ -163,13 +167,19 @@ test('the rating accessible name carries both value and wording', () => {
   player.openSection('s2');
   player.state.currentPage = 2;
   player.render();
-  assert.equal(mount.querySelectorAll('[data-q="q_s2_3"]')[1].getAttribute('aria-label'), '4, Agree');
+  const s2 = mount.querySelector('[data-q="q_s2_3"]');
+  s2.value = '3';
+  s2.dispatch('input');
+  assert.equal(mount.querySelector('[data-q="q_s2_3"]').getAttribute('aria-valuetext'), '4, Agree');
 
   // For an unlabeled numeric scale, "1, 1" would be noise.
   player.openSection('s3');
   player.state.currentPage = 1;
   player.render();
-  assert.equal(mount.querySelectorAll('[data-q="q_s3_2"]')[0].getAttribute('aria-label'), '1');
+  const s3 = mount.querySelector('[data-q="q_s3_2"]');
+  s3.value = '0';
+  s3.dispatch('input');
+  assert.equal(mount.querySelector('[data-q="q_s3_2"]').getAttribute('aria-valuetext'), '1');
 });
 
 // ---- resume + review rewind ---------------------------------------------

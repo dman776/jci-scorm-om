@@ -108,7 +108,7 @@ body {
 .sowb-question { background: var(--sowb-card); border: 1px solid var(--sowb-border); border-radius: 10px; padding: 20px; }
 /* Locked answers stay fully legible; only the controls read as inert. */
 .sowb-question.locked input, .sowb-question.locked textarea, .sowb-question.locked select { cursor: not-allowed; }
-.sowb-question.locked .sowb-choice, .sowb-question.locked .sowb-rating-row, .sowb-question.locked .sowb-rating-item { cursor: not-allowed; }
+.sowb-question.locked .sowb-choice { cursor: not-allowed; }
 .sowb-prompt { font-size: 17px; font-weight: 600; display: block; }
 .sowb-req { color: #c0392b; }
 .sowb-help { color: var(--sowb-gray); font-size: 14px; margin: 6px 0 14px; }
@@ -128,36 +128,31 @@ body {
 .sowb-choice:hover { background: #f7f9ff; }
 .sowb-check { display: flex; align-items: center; gap: 10px; margin-top: 12px; }
 
-/* ---- rating scales ---- */
-.sowb-rating-wrap { margin-top: 12px; }
-
-/* Compact: short labels (numbers) sit in a row of chips. */
-.sowb-rating.sowb-rating-compact { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
-.sowb-rating-compact .sowb-rating-item {
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  border: 1px solid var(--sowb-border); border-radius: 8px;
-  padding: 10px 14px; cursor: pointer; min-width: 56px;
+/* ---- rating scales (slider) ---- */
+.sowb-rating-slider { margin-top: 12px; }
+.sowb-rating-readout { display: flex; align-items: center; gap: 10px; min-height: 28px; margin-bottom: 8px; font-weight: 600; }
+.sowb-rating-readout .sowb-rating-value {
+  min-width: 26px; height: 26px; display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 999px; background: #eef2fb; color: var(--sowb-blue-2); font-size: 12px; font-weight: 700;
 }
-.sowb-rating-compact .sowb-rating-item:hover { background: #f7f9ff; }
-
-/* End captions under a compact numeric scale. */
+.sowb-rating-readout .sowb-rating-value:empty { display: none; }
+.sowb-rating-slider:not(.answered) .sowb-rating-current { font-weight: 400; color: var(--sowb-gray); }
+.sowb-rating-range { width: 100%; margin: 0; cursor: pointer; accent-color: var(--sowb-blue-2); }
+.sowb-rating-slider:not(.answered) .sowb-rating-range { opacity: .55; }
+.sowb-rating-range:disabled { cursor: not-allowed; }
+/* Tick marks + labels, one per stop, placed where the thumb lands. 8px is half
+   the usual thumb width; the side padding leaves room for the end labels. */
+.sowb-rating-slider { padding: 0 24px; }
+.sowb-rating-ticks { position: relative; height: 3.6em; margin-top: 2px; font-size: 12px; color: var(--sowb-gray); }
+.sowb-rating-stop {
+  position: absolute; top: 0; left: calc(8px + var(--f) * (100% - 16px));
+  width: min(7em, calc((100% - 16px) / var(--last)));
+  transform: translateX(-50%); text-align: center; line-height: 1.2;
+}
+.sowb-rating-tick { display: block; width: 2px; height: 7px; margin: 0 auto 3px; background: #9aa5b8; }
+.sowb-rating-label { display: block; overflow-wrap: anywhere; }
+/* End captions under a numeric scale. */
 .sowb-rating-anchors { display: flex; justify-content: space-between; margin-top: 6px; font-size: 12px; color: var(--sowb-gray); }
-
-/* Listed: long labels get one row each, which reads correctly on a phone and
-   gives screen readers a sane reading order. */
-.sowb-rating.sowb-rating-listed { display: grid; gap: 8px; margin-top: 12px; }
-.sowb-rating-listed .sowb-rating-row {
-  display: flex; align-items: center; gap: 12px;
-  padding: 10px 12px; border: 1px solid var(--sowb-border); border-radius: 8px; cursor: pointer;
-}
-.sowb-rating-listed .sowb-rating-row:hover { background: #f7f9ff; }
-.sowb-rating-listed .sowb-rating-value {
-  flex: 0 0 auto; min-width: 26px; height: 26px;
-  display: inline-flex; align-items: center; justify-content: center;
-  border-radius: 999px; background: #eef2fb; color: var(--sowb-blue-2);
-  font-size: 12px; font-weight: 700;
-}
-.sowb-rating-listed .sowb-rating-label { flex: 1; }
 
 .sowb-evidence { margin-top: 12px; }
 .sowb-evidence-chip { margin-top: 10px; background: #eef7ff; border: 1px solid #cfe4ff; padding: 8px 12px; border-radius: 8px; font-size: 13px; }
@@ -186,8 +181,4 @@ a:focus-visible, button:focus-visible, input:focus-visible, textarea:focus-visib
   .sowb-header-right { width: 100%; justify-content: space-between; }
   .sowb-progress { flex: 1; min-width: 160px; }
   .sowb-section-card { flex-direction: column; align-items: flex-start; }
-}
-@media (max-width: 480px) {
-  /* Even "compact" gets cramped on a small phone, so let chips grow. */
-  .sowb-rating-compact .sowb-rating-item { flex: 1 1 60px; }
 }

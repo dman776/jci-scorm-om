@@ -24,14 +24,13 @@ const EXPECTED_GATED = ['checklist', 'multiple_select'];
 const EXPECTED_REPORTED = ['single_select'];
 
 let selectedSectionId = null;
-/** Scale library, fetched once and reused across re-renders. */
+/** Scale library, refetched each time the screen opens so edits made on the Rating Scales screen show up. */
 let scaleLibrary = null;
 
 export async function renderEditor(mount, { store, api }) {
-  // Load the library once so the rating picker has it synchronously afterwards.
-  if (scaleLibrary === null) {
-    try { scaleLibrary = await api.listScales(); } catch (_) { scaleLibrary = []; }
-  }
+  // Load the library up front so the rating picker has it synchronously. On a
+  // failed refetch keep the last good copy rather than emptying the picker.
+  try { scaleLibrary = await api.listScales(); } catch (_) { if (scaleLibrary === null) scaleLibrary = []; }
   draw(mount, store, api);
 }
 

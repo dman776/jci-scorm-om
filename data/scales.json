@@ -6,10 +6,49 @@
       "name": "Safety Adherence (4-point)",
       "description": "Observed adherence to safety procedures during a ride-along.",
       "points": [
-        { "value": 1, "label": "Consistently followed" },
-        { "value": 2, "label": "Mostly followed" },
-        { "value": 3, "label": "Occasionally followed" },
-        { "value": 4, "label": "Did not follow" }
+        {
+          "value": 1,
+          "label": "Consistently followed"
+        },
+        {
+          "value": 2,
+          "label": "Mostly followed"
+        },
+        {
+          "value": 3,
+          "label": "Occasionally followed"
+        },
+        {
+          "value": 4,
+          "label": "Did not follow"
+        }
+      ]
+    },
+    {
+      "id": "pacing",
+      "name": "Pacing",
+      "description": "",
+      "points": [
+        {
+          "value": 1,
+          "label": "Too Slow"
+        },
+        {
+          "value": 2,
+          "label": "A Little Slow"
+        },
+        {
+          "value": 3,
+          "label": "Just Right"
+        },
+        {
+          "value": 4,
+          "label": "A Little Fast"
+        },
+        {
+          "value": 5,
+          "label": "Too Fast"
+        }
       ]
     }
   ]

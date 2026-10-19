@@ -151,8 +151,12 @@ textarea { resize: vertical; }
 
 .scale-preview { margin-top: 12px; padding: 12px; background: #f7f9ff; border: 1px solid var(--border); border-radius: 8px; }
 .preview-body { margin-top: 8px; }
-.preview-body.compact { display: flex; gap: 8px; flex-wrap: wrap; }
-.preview-body.listed { display: grid; gap: 6px; }
+.preview-range { width: 100%; margin: 0; }
+.preview-body { padding: 0 24px; }
+.preview-ticks { position: relative; height: 3.6em; margin-top: 2px; font-size: 12px; color: var(--muted, #666); }
+.preview-stop { position: absolute; top: 0; left: calc(8px + var(--f) * (100% - 16px)); width: min(7em, calc((100% - 16px) / var(--last))); transform: translateX(-50%); text-align: center; line-height: 1.2; }
+.preview-tick { display: block; width: 2px; height: 7px; margin: 0 auto 3px; background: #9aa5b8; }
+.preview-label { display: block; overflow-wrap: anywhere; }
 .preview-point { display: inline-flex; align-items: center; gap: 8px; background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; font-size: 13px; }
 .preview-value { min-width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: #eef2fb; color: var(--blue-2); font-size: 11px; font-weight: 700; }
 .preview-anchors { display: flex; justify-content: space-between; margin-top: 6px; font-size: 12px; color: var(--muted); }
