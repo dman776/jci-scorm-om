@@ -21,7 +21,7 @@ npm start            # authoring app at http://127.0.0.1:4173/
 1. **Workbook Settings** — title, version, course id, dashboard heading, PDF download, navigation.
 2. **Sections** — add sections (Required/Optional, optionally *locking*), then add observation questions.
 3. **Rating Scales** — manage the reusable scale library.
-4. **Preview** — run the real runtime against a mock LMS; test Exit + resume.
+4. **Preview** — run the real runtime against a mock LMS; test Exit + resume. Every question card on **Sections** also has its own **Preview** button, which opens just that question in a modal. The SCORM debug panel is off by default; tick *Show SCORM debug panel* in the preview bar to watch the data model.
 5. **Publish** — validate, then **Build SCORM ZIP**.
 
 ```bash
@@ -110,7 +110,7 @@ Each point has a **value** (stored in `cmi.suspend_data`, shown to facilitators)
 
 1. **Scales are inlined at publish, not looked up at runtime.** The SCO is offline and cannot call back to the server, so `inlineScales()` bakes concrete points into the package. **Editing a scale does not change an already-published package** — republish to pick up new wording.
 2. **A dangling `scaleId` blocks export** rather than silently publishing an empty scale. The Rating Scales screen checks usage before deleting and lists affected questions.
-3. **Rendering adapts to the labels.** Short labels (numbers) render as a row of chips; longer labels render one row per point with a value badge, which reads correctly on a phone and in a screen reader. Screen readers hear "2, Agree", collapsing to just "1" on unlabeled scales. Short numeric scales support optional end captions ("Not at all" … "Expert").
+3. **Ratings render as a slider.** One range input per question, with a tick mark and label at every stop and a readout of the selected value above the track. Numeric scales always run **lowest on the left, highest on the right**, whatever order the scale is listed in (`agreement-5` is stored high-to-low but displays 1 → 5); word-valued scales keep their authored order, last point highest. Until the learner moves or taps the slider it shows dimmed and nothing is stored, so an untouched slider never counts as an answer. Screen readers hear "4, Agree", collapsing to just "1" on unlabeled scales. Short numeric scales support optional end captions ("Not at all" … "Expert"). The editor's *Learner preview* mirrors this and updates as you type.
 
 ### Backward compatibility
 

@@ -54,6 +54,10 @@
       window.__PLAYER__ = player;
       window.__LMS__ = lms;
       player.init();
+      // Per-question preview: skip the dashboard and open the lone section.
+      if (new URLSearchParams(location.search).has('single') && workbook.sections[0]) {
+        player.openSection(workbook.sections[0].id);
+      }
     }
 
     document.getElementById('exitResume').addEventListener('click', () => {

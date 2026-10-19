@@ -1,5 +1,5 @@
 // @ts-check
-import { h } from '../ui.js';
+import { h, toast } from '../ui.js';
 import { newOptionId } from '../ids-browser.js';
 import { renderRatingEditor } from './rating-editor.js';
 
@@ -125,6 +125,7 @@ function renderQuestionCard(section, q, qi, store, rerender) {
       h('span.q-index', String(qi + 1)),
       h('span.q-type-tag', typeMeta.label),
       h('div.q-card-actions', [
+        h('button.btn.small.ghost', { title: 'Preview just this question as the learner sees it', onclick: () => previewQuestion(store.workbook, section, q) }, 'Preview'),
         iconBtn('\u2191', 'Move up', () => { store.moveQuestion(section.id, q.id, -1); rerender(); }),
         iconBtn('\u2193', 'Move down', () => { store.moveQuestion(section.id, q.id, 1); rerender(); }),
         iconBtn('\u29c9', 'Duplicate', () => { store.duplicateQuestion(section.id, q.id); rerender(); }),
@@ -286,4 +287,34 @@ function changeType(q, type) {
 }
 
 function isNum(v) { return v !== undefined && v !== null && v !== '' && isFinite(Number(v)); }
+/**
+ * Preview one question: a throwaway workbook holding only that question in its
+ * own section, loaded into the learner harness inside a modal.
+ */
+async function previewQuestion(wb, section, q) {
+  const single = JSON.parse(JSON.stringify({
+    ...wb,
+    sections: [{ ...section, questions: [q] }],
+  }));
+  const dialog = h('dialog.q-preview-dialog', [
+    h('div.q-preview-head', [
+      h('strong', 'Question preview'),
+      h('button.btn.small.ghost', { onclick: () => dialog.close() }, 'Close'),
+    ]),
+  ]);
+  const frame = h('iframe.q-preview-frame', { title: 'Question preview', src: 'about:blank' });
+  dialog.appendChild(frame);
+  dialog.addEventListener('close', () => dialog.remove());
+  document.body.appendChild(dialog);
+  dialog.showModal();
+  try {
+    const res = await fetch('/api/preview', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(single) });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    frame.src = '/preview/harness.html?single=1&t=' + Date.now();
+  } catch (err) {
+    dialog.close();
+    toast('Preview failed: ' + err.message, 'error');
+  }
+}
+
 function iconBtn(glyph, title, onclick) { return h('button.icon-btn', { title, onclick }, glyph); }
