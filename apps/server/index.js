@@ -208,12 +208,14 @@ async function handlePreview(req, res, path) {
 async function serveStatic(res, path) {
   let rel = path === '/' ? '/index.html' : path;
   rel = normalize(rel).replace(/^(\.\.[/\\])+/, '');
+  // Revalidate on every load so an updated UI is never run from a stale cached module.
+  const noCache = { 'Cache-Control': 'no-cache' };
   const file = join(WEB_DIR, rel);
   if (!file.startsWith(WEB_DIR)) return sendText(res, 403, 'Forbidden', 'text/plain');
   try {
-    return sendBuffer(res, 200, await readFile(file), mimeFor(file));
+    return sendBuffer(res, 200, await readFile(file), mimeFor(file), noCache);
   } catch (_) {
-    try { return sendBuffer(res, 200, await readFile(join(WEB_DIR, 'index.html')), 'text/html'); }
+    try { return sendBuffer(res, 200, await readFile(join(WEB_DIR, 'index.html')), 'text/html', noCache); }
     catch (_2) { return sendText(res, 404, 'Not found', 'text/plain'); }
   }
 }
@@ -237,8 +239,8 @@ function sendText(res, code, text, type) {
   res.writeHead(code, { 'Content-Type': type || 'text/plain; charset=utf-8' });
   res.end(text);
 }
-function sendBuffer(res, code, buf, type) {
-  res.writeHead(code, { 'Content-Type': type });
+function sendBuffer(res, code, buf, type, headers = {}) {
+  res.writeHead(code, { 'Content-Type': type, ...headers });
   res.end(buf);
 }
 function readBodyBuffer(req) {
