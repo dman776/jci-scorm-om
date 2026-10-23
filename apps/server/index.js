@@ -19,7 +19,7 @@ import { validateWorkbook, estimateWorstCaseSuspend, publishWorkbook, listTarget
 import { assembleRuntime } from '@sowb/scorm-runtime';
 import { buildTemplateXlsx, importWorkbookXlsx } from '@sowb/excel-io/workbook-xlsx.js';
 
-import { listWorkbooks, readAllWorkbooks, getWorkbook, saveWorkbook, cloneWorkbook, renameWorkbook, deleteWorkbook } from './store.js';
+import { listWorkbooks, readAllWorkbooks, getWorkbook, saveWorkbook, cloneWorkbook, renameWorkbook, deleteWorkbook, moveWorkbook, listFolders, createFolder, renameFolder, deleteFolder } from './store.js';
 import { listCustomScales, listAllScales, saveScale, deleteScale, findScaleUsage } from './scales-store.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -54,13 +54,38 @@ async function handleApi(req, res, path, url) {
   if (path === '/api/workbooks' && req.method === 'POST') return sendJson(res, 200, await saveWorkbook(await readBodyJson(req), url.searchParams.get('file') || undefined));
   if (path === '/api/workbooks/new' && req.method === 'GET') return sendJson(res, 200, blankWorkbook());
 
-  const cloneMatch = /^\/api\/workbooks\/([^/]+)\/clone$/.exec(path);
+  // ---- library folders ----
+  if (path === '/api/folders' && req.method === 'GET') return sendJson(res, 200, await listFolders());
+  if (path.startsWith('/api/folders') && ['POST', 'DELETE'].includes(req.method)) {
+    try {
+      if (path === '/api/folders' && req.method === 'POST') return sendJson(res, 200, { folder: await createFolder((await readBodyJson(req)).path) });
+      if (path === '/api/folders/rename' && req.method === 'POST') {
+        const { path: folder, name } = await readBodyJson(req);
+        return sendJson(res, 200, { folder: await renameFolder(folder, name) });
+      }
+      if (path === '/api/folders' && req.method === 'DELETE') return sendJson(res, 200, { deleted: await deleteFolder(url.searchParams.get('path')) });
+    } catch (err) {
+      return sendJson(res, err.status || 500, { error: err.message });
+    }
+  }
+
+  const moveMatch = /^\/api\/workbooks\/(.+)\/move$/.exec(path);
+  if (moveMatch && req.method === 'POST') {
+    try {
+      const { folder } = await readBodyJson(req);
+      return sendJson(res, 200, { file: await moveWorkbook(moveMatch[1], folder) });
+    } catch (err) {
+      return sendJson(res, err.status || 500, { error: err.message });
+    }
+  }
+
+  const cloneMatch = /^\/api\/workbooks\/(.+)\/clone$/.exec(path);
   if (cloneMatch && req.method === 'POST') {
     const copy = await cloneWorkbook(cloneMatch[1]);
     return copy ? sendJson(res, 200, copy) : sendJson(res, 404, { error: 'Not found' });
   }
 
-  const renameMatch = /^\/api\/workbooks\/([^/]+)\/rename$/.exec(path);
+  const renameMatch = /^\/api\/workbooks\/(.+)\/rename$/.exec(path);
   if (renameMatch && req.method === 'POST') {
     try {
       const { name } = await readBodyJson(req);
@@ -70,7 +95,7 @@ async function handleApi(req, res, path, url) {
     }
   }
 
-  const wbMatch = /^\/api\/workbooks\/([^/]+)$/.exec(path);
+  const wbMatch = /^\/api\/workbooks\/(.+)$/.exec(path);
   if (wbMatch) {
     const id = wbMatch[1];
     if (req.method === 'GET') {

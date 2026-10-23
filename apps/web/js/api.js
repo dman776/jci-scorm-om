@@ -22,6 +22,11 @@ export const api = {
   saveWorkbook: (wb, file) => jsonFetch('/api/workbooks' + (file ? '?file=' + encodeURIComponent(file) : ''), { method: 'POST', headers: json(), body: JSON.stringify(wb) }),
   cloneWorkbook: (file) => jsonFetch('/api/workbooks/' + encodeURIComponent(file) + '/clone', { method: 'POST' }),
   renameWorkbook: (file, name) => jsonFetch('/api/workbooks/' + encodeURIComponent(file) + '/rename', { method: 'POST', headers: json(), body: JSON.stringify({ name }) }),
+  moveWorkbook: (file, folder) => jsonFetch('/api/workbooks/' + encodeURIComponent(file) + '/move', { method: 'POST', headers: json(), body: JSON.stringify({ folder }) }),
+  listFolders: () => jsonFetch('/api/folders'),
+  createFolder: (path) => jsonFetch('/api/folders', { method: 'POST', headers: json(), body: JSON.stringify({ path }) }),
+  renameFolder: (path, name) => jsonFetch('/api/folders/rename', { method: 'POST', headers: json(), body: JSON.stringify({ path, name }) }),
+  deleteFolder: (path) => jsonFetch('/api/folders?path=' + encodeURIComponent(path), { method: 'DELETE' }),
   deleteWorkbook: (id) => jsonFetch('/api/workbooks/' + encodeURIComponent(id), { method: 'DELETE' }),
 
   listScales: () => jsonFetch('/api/scales'),

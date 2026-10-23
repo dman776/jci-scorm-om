@@ -183,7 +183,19 @@ textarea { resize: vertical; }
 .lib-item { display: flex; align-items: center; justify-content: space-between; border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
 .lib-name { font-weight: 600; }
 .lib-meta { color: var(--muted); font-size: 13px; margin-left: 10px; }
-.lib-item-actions { display: flex; gap: 8px; }
+.lib-item-actions { display: flex; gap: 8px; align-items: center; }
+.lib-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-bottom: 12px; }
+.lib-sep { color: var(--muted); }
+.lib-spacer { flex: 1; }
+.lib-folder { cursor: pointer; }
+.lib-folder:hover { background: #f4f6fa; }
+.lib-move {
+  width: auto; max-width: 150px; padding: 5px 28px 5px 10px; font-size: 13px; font-weight: 600; line-height: normal;
+  color: var(--blue-2); border-radius: 8px; cursor: pointer;
+  -webkit-appearance: none; -moz-appearance: none; appearance: none;
+  background: #fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23888' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat right 10px center;
+}
+.lib-move:hover { background-color: #f2f6ff; }
 
 /* ---- preview ---- */
 .preview-toolbar { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; flex-wrap: wrap; }

@@ -1,6 +1,9 @@
 // @ts-check
 import { h, toast, downloadBlob, confirmDialog } from '../ui.js';
 
+/** The folder being browsed; survives leaving and returning to the screen. */
+let currentFolder = '';
+
 export async function renderLibrary(mount, { store, api, navigate }) {
   const inner = h('div.screen-inner', [
     h('h1.screen-title', 'Library'),
@@ -20,27 +23,103 @@ export async function renderLibrary(mount, { store, api, navigate }) {
   mount.appendChild(inner);
   await refreshList();
 
+  function parentOf(path) { return path.includes('/') ? path.slice(0, path.lastIndexOf('/')) : ''; }
+  function baseOf(path) { return path.slice(path.lastIndexOf('/') + 1); }
+  function folderOf(file) { return parentOf(file); }
+
   async function refreshList() {
     const listEl = inner.querySelector('#lib-list');
     listEl.innerHTML = '';
     try {
-      const items = await api.listWorkbooks();
-      if (!items.length) { listEl.appendChild(h('p.muted', 'No saved workbooks yet.')); return; }
-      listEl.appendChild(h('ul.lib-items', items.map((w) => h('li.lib-item', [
-        h('div.lib-item-main', [
-          h('span.lib-name', w.title),
-          h('span.lib-meta', w.unreadable ? `${w.file} \u00b7 not a readable workbook` : `v${w.version} \u00b7 ${w.sections} section${w.sections === 1 ? '' : 's'} \u00b7 ${w.file}`),
-        ]),
-        h('div.lib-item-actions', [
-          w.unreadable ? null : h('button.btn.small', { onclick: () => onOpen(w.file) }, 'Open'),
-          w.unreadable ? null : h('button.btn.small.ghost', { onclick: () => onClone(w.file) }, 'Clone'),
-          h('button.btn.small.ghost', { title: 'Rename the file', onclick: () => onRename(w.file) }, 'Rename'),
-          h('button.btn.small.ghost', { onclick: () => onDelete(w.file) }, 'Delete'),
-        ]),
-      ]))));
+      const [items, folders] = await Promise.all([api.listWorkbooks(), api.listFolders()]);
+      if (currentFolder && !folders.includes(currentFolder)) currentFolder = '';
+      const subfolders = folders.filter((f) => parentOf(f) === currentFolder);
+      const here = items.filter((w) => folderOf(w.file) === currentFolder);
+
+      const crumbs = [h('button.btn.small.ghost', { onclick: () => goTo('') }, 'Library')];
+      let acc = '';
+      for (const seg of currentFolder.split('/').filter(Boolean)) {
+        acc = acc ? acc + '/' + seg : seg;
+        const target = acc;
+        crumbs.push(h('span.lib-sep', '/'), h('button.btn.small.ghost', { onclick: () => goTo(target) }, seg));
+      }
+      listEl.appendChild(h('div.lib-crumbs', [
+        ...crumbs,
+        h('span.lib-spacer'),
+        currentFolder ? h('button.btn.small.ghost', { onclick: () => onRenameFolder(currentFolder) }, 'Rename folder') : null,
+        currentFolder ? h('button.btn.small.ghost', { onclick: () => onDeleteFolder(currentFolder) }, 'Delete folder') : null,
+        h('button.btn.small', { onclick: () => onNewFolder() }, '+ New folder'),
+      ]));
+
+      if (!subfolders.length && !here.length) {
+        listEl.appendChild(h('p.muted', currentFolder ? 'This folder is empty.' : 'No saved workbooks yet.'));
+        return;
+      }
+      const moveTargets = [''].concat(folders);
+      listEl.appendChild(h('ul.lib-items', [
+        ...subfolders.map((f) => {
+          const count = items.filter((w) => w.file.startsWith(f + '/')).length;
+          return h('li.lib-item.lib-folder', { onclick: () => goTo(f) }, [
+            h('div.lib-item-main', [
+              h('span.lib-name', '\ud83d\udcc1 ' + baseOf(f)),
+              h('span.lib-meta', `${count} workbook${count === 1 ? '' : 's'}`),
+            ]),
+          ]);
+        }),
+        ...here.map((w) => h('li.lib-item', [
+          h('div.lib-item-main', [
+            h('span.lib-name', w.title),
+            h('span.lib-meta', w.unreadable ? `${baseOf(w.file)} \u00b7 not a readable workbook` : `v${w.version} \u00b7 ${w.sections} section${w.sections === 1 ? '' : 's'} \u00b7 ${baseOf(w.file)}`),
+          ]),
+          h('div.lib-item-actions', [
+            h('select.lib-move', { title: 'Move to folder', onchange: (e) => onMove(w.file, e.target.value) }, [
+              h('option', { value: '', disabled: true, selected: true }, 'Move to\u2026'),
+              ...moveTargets.filter((f) => f !== currentFolder).map((f) => h('option', { value: f === '' ? '/' : f }, f === '' ? 'Library (top level)' : f)),
+            ]),
+            w.unreadable ? null : h('button.btn.small', { onclick: () => onOpen(w.file) }, 'Open'),
+            w.unreadable ? null : h('button.btn.small.ghost', { onclick: () => onClone(w.file) }, 'Clone'),
+            h('button.btn.small.ghost', { title: 'Rename the file', onclick: () => onRename(w.file) }, 'Rename'),
+            h('button.btn.small.ghost', { onclick: () => onDelete(w.file) }, 'Delete'),
+          ]),
+        ])),
+      ]));
     } catch (err) {
       listEl.appendChild(h('p.error', 'Could not load: ' + err.message));
     }
+  }
+
+  function goTo(folder) { currentFolder = folder; return refreshList(); }
+  async function onNewFolder() {
+    const name = window.prompt(currentFolder ? `New folder inside ${currentFolder}:` : 'New folder name:');
+    if (name === null || !name.trim()) return;
+    try {
+      const { folder } = await api.createFolder((currentFolder ? currentFolder + '/' : '') + name.trim());
+      toast('Created folder ' + folder, 'success');
+      await goTo(folder);
+    } catch (err) { toast('Could not create folder: ' + err.message, 'error'); }
+  }
+  async function onRenameFolder(folder) {
+    const name = window.prompt('New folder name:', baseOf(folder));
+    if (name === null) return;
+    try {
+      const { folder: renamed } = await api.renameFolder(folder, name);
+      if (store.file && store.file.startsWith(folder + '/')) store.setFile(renamed + store.file.slice(folder.length));
+      toast('Renamed to ' + renamed, 'success');
+      await goTo(renamed);
+    } catch (err) { toast('Rename failed: ' + err.message, 'error'); }
+  }
+  async function onDeleteFolder(folder) {
+    if (!(await confirmDialog(`Delete the folder ${folder}? Only empty folders can be deleted.`))) return;
+    try { await api.deleteFolder(folder); toast('Folder deleted', 'info'); await goTo(parentOf(folder)); }
+    catch (err) { toast('Could not delete folder: ' + err.message, 'error'); }
+  }
+  async function onMove(file, folder) {
+    try {
+      const { file: moved } = await api.moveWorkbook(file, folder === '/' ? '' : folder);
+      if (store.file === file) store.setFile(moved);
+      toast('Moved to ' + (folder === '/' ? 'Library' : folder), 'success');
+    } catch (err) { toast('Move failed: ' + err.message, 'error'); }
+    await refreshList();
   }
 
   async function onNew() {

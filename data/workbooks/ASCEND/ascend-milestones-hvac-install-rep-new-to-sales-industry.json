@@ -1,0 +1,339 @@
+{
+  "id": "ascend-milestones-hvac-install-rep-new-to-sales-industry",
+  "title": "HVAC Install Rep New to Sales and New to Industry",
+  "description": "Milestones and Assessments for sellers in the ASCEND program",
+  "version": "1.0",
+  "author": "Darryl Quinn",
+  "courseId": "",
+  "estimatedDuration": "12 months",
+  "settings": {
+    "language": "en-US",
+    "navigation": "free",
+    "completionRule": "all-required-sections",
+    "reportSuccess": false,
+    "dashboardHeading": "ASCEND Milestones",
+    "allowPdfDownload": true
+  },
+  "sections": [
+    {
+      "id": "s_hbdd7bfr",
+      "title": "Month 1",
+      "required": true,
+      "questions": [
+        {
+          "id": "q_axuqa5x1",
+          "type": "single_select",
+          "prompt": "At what time in your new hire process did you meet your manager?",
+          "required": true,
+          "options": [
+            {
+              "id": "o_yra8x1ev",
+              "label": "Week 1"
+            },
+            {
+              "id": "o_d63dbpdh",
+              "label": "Week 2"
+            },
+            {
+              "id": "o_v8y32paa",
+              "label": "Week 3"
+            },
+            {
+              "id": "o_t7z37b58",
+              "label": "Week 4"
+            },
+            {
+              "id": "o_gx225q89",
+              "label": "I haven't met with my manager in Month 1"
+            }
+          ]
+        },
+        {
+          "id": "q_es9wym98",
+          "type": "yes_no",
+          "prompt": "Have you met at least 2 people from your team?",
+          "required": true
+        },
+        {
+          "id": "q_936dbcxs",
+          "type": "single_select",
+          "prompt": "Rate the pace of the program",
+          "required": true,
+          "options": [
+            {
+              "id": "o_jj6w3sef",
+              "label": "Too slow"
+            },
+            {
+              "id": "o_e3rim6q2",
+              "label": "I can go at a faster pace"
+            },
+            {
+              "id": "o_wi7km0kr",
+              "label": "Correct pace"
+            },
+            {
+              "id": "o_cw8adi07",
+              "label": "Too fast"
+            },
+            {
+              "id": "o_1h67g5aw",
+              "label": "There are too many topics to learn this quickly"
+            }
+          ]
+        },
+        {
+          "id": "q_5kz16nvc",
+          "type": "yes_no",
+          "prompt": "Upon logging into Salesforce, can you navigate to see your opportunities?",
+          "required": true
+        },
+        {
+          "id": "q_fy6505j6",
+          "type": "single_select",
+          "prompt": "Have you had a meeting with anyone from GCOE?",
+          "required": true,
+          "options": [
+            {
+              "id": "o_u59trpa9",
+              "label": "Yes"
+            },
+            {
+              "id": "o_8197bgjg",
+              "label": "No"
+            },
+            {
+              "id": "o_4nkcz673",
+              "label": "I opted out of a GCOE Connect"
+            }
+          ]
+        },
+        {
+          "id": "q_wgpv7bn4",
+          "type": "single_select",
+          "prompt": "If yes to the above GCOE question, have you created a case with the GCOE?",
+          "required": true,
+          "options": [
+            {
+              "id": "o_eqb9d09s",
+              "label": "Yes"
+            },
+            {
+              "id": "o_fkxfi4ak",
+              "label": "No"
+            },
+            {
+              "id": "o_1kuu3gua",
+              "label": "I have created a case but not with the GCOE"
+            },
+            {
+              "id": "o_b3nbth7z",
+              "label": "Not applicable"
+            }
+          ]
+        },
+        {
+          "id": "q_eq5q2m1d",
+          "type": "yes_no",
+          "prompt": "Have you reviewed and do you understand your compensation?",
+          "required": true
+        },
+        {
+          "id": "q_bsi7a65p",
+          "type": "rating",
+          "prompt": "I know what kind of support is available to me and how to engage them.",
+          "required": true,
+          "scaleId": "agreement-5",
+          "scale": [
+            {
+              "value": 5,
+              "label": "Strongly Agree"
+            },
+            {
+              "value": 4,
+              "label": "Agree"
+            },
+            {
+              "value": 3,
+              "label": "Neutral"
+            },
+            {
+              "value": 2,
+              "label": "Disagree"
+            },
+            {
+              "value": 1,
+              "label": "Strongly Disagree"
+            }
+          ],
+          "scaleName": "Agreement (5-point)"
+        },
+        {
+          "id": "q_a74zf3nq",
+          "type": "yes_no",
+          "prompt": "Were you assigned an Onboarding buddy or team mentor?",
+          "required": true
+        },
+        {
+          "id": "q_5h86ejtd",
+          "type": "multiple_select",
+          "prompt": "Click on any ride along that you completed.",
+          "required": true,
+          "options": [
+            {
+              "id": "o_q38i0xw6",
+              "label": " Sales Manager"
+            },
+            {
+              "id": "o_6gisf50p",
+              "label": "Peer"
+            },
+            {
+              "id": "o_devimfv7",
+              "label": "Technician"
+            },
+            {
+              "id": "o_3g8qtbxa",
+              "label": "I did not attend a ride along yet but they are scheduled"
+            },
+            {
+              "id": "o_khp6imbv",
+              "label": " I will not be doing any ride alongs"
+            }
+          ]
+        },
+        {
+          "id": "q_3vhk6np5",
+          "type": "rating",
+          "prompt": "Rate your understanding of JCI HVAC chiller Offerings",
+          "required": true,
+          "scaleId": "confidence-3",
+          "scale": [
+            {
+              "value": "Low",
+              "label": "Low"
+            },
+            {
+              "value": "Medium",
+              "label": "Medium"
+            },
+            {
+              "value": "High",
+              "label": "High"
+            }
+          ],
+          "scaleName": "Confidence (Low / Medium / High)"
+        },
+        {
+          "id": "q_5tb5hre3",
+          "type": "rating",
+          "prompt": "Rate your understanding of JCI HVAC Air systems Offerings",
+          "required": true,
+          "scaleId": "confidence-3",
+          "scale": [
+            {
+              "value": "Low",
+              "label": "Low"
+            },
+            {
+              "value": "Medium",
+              "label": "Medium"
+            },
+            {
+              "value": "High",
+              "label": "High"
+            }
+          ],
+          "scaleName": "Confidence (Low / Medium / High)"
+        },
+        {
+          "id": "q_hj619131",
+          "type": "rating",
+          "prompt": "Rate your understanding of JCI Controls Offerings",
+          "required": true,
+          "scaleId": "confidence-3",
+          "scale": [
+            {
+              "value": "Low",
+              "label": "Low"
+            },
+            {
+              "value": "Medium",
+              "label": "Medium"
+            },
+            {
+              "value": "High",
+              "label": "High"
+            }
+          ],
+          "scaleName": "Confidence (Low / Medium / High)"
+        },
+        {
+          "id": "q_5r3x0zya",
+          "type": "rating",
+          "prompt": "Rate your understanding of JCI Digital Offerings",
+          "required": true,
+          "scaleId": "confidence-3",
+          "scale": [
+            {
+              "value": "Low",
+              "label": "Low"
+            },
+            {
+              "value": "Medium",
+              "label": "Medium"
+            },
+            {
+              "value": "High",
+              "label": "High"
+            }
+          ],
+          "scaleName": "Confidence (Low / Medium / High)"
+        },
+        {
+          "id": "q_v3vx3v8s",
+          "type": "yes_no",
+          "prompt": "I can describe the SPIN selling method.",
+          "required": true
+        },
+        {
+          "id": "q_hq19i11p",
+          "type": "single_select",
+          "prompt": "Have you attended a JCI customer meeting?",
+          "required": true,
+          "options": [
+            {
+              "id": "o_j3pn532n",
+              "label": "Yes with a peer or manager"
+            },
+            {
+              "id": "o_fz4j4x0g",
+              "label": "Yes I ran one myself"
+            },
+            {
+              "id": "o_1gdrct11",
+              "label": "Not yet but I have one scheduled"
+            },
+            {
+              "id": "o_xcuj5g4a",
+              "label": "No and I don’t have any scheduled"
+            }
+          ]
+        },
+        {
+          "id": "q_jxtct41g",
+          "type": "long_text",
+          "prompt": "What, in the ASCEND program, have you found beneficial?",
+          "required": false
+        },
+        {
+          "id": "q_8u6htfxz",
+          "type": "long_text",
+          "prompt": "What, in the ASCEND program, would you like to improve",
+          "required": false
+        }
+      ],
+      "lockWhenComplete": true
+    }
+  ]
+}
