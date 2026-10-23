@@ -1,0 +1,137 @@
+{
+  "id": "ae-sales-ride-along-observation-workbook",
+  "title": "AE Sales Ride-Along Observation Workbook",
+  "description": "Field observation workbook for Associate Account Executives riding along with an experienced Sales Representative. Complete the pre-call preparation observations, then an interview/observation sheet for each sales appointment.",
+  "version": "1.0",
+  "author": "Johnson Controls ASCEND Learning",
+  "courseId": "ascend-ae-sales-ride-along",
+  "estimatedDuration": "1-2 weeks",
+  "settings": {
+    "language": "en-US",
+    "navigation": "free",
+    "completionRule": "all-required-sections",
+    "reportSuccess": false
+  },
+  "sections": [
+    {
+      "id": "s1",
+      "title": "Ride-Along Details",
+      "required": true,
+      "questions": [
+        {
+          "id": "q_s1_1",
+          "type": "datetime",
+          "prompt": "Date of the ride-along",
+          "required": true
+        },
+        {
+          "id": "q_s1_2",
+          "type": "short_text",
+          "prompt": "Host Sales Rep",
+          "required": true,
+          "helpText": "Name of the experienced Sales Representative you rode along with."
+        },
+        {
+          "id": "q_s1_3",
+          "type": "short_text",
+          "prompt": "Number of appointments scheduled for the day",
+          "required": true,
+          "helpText": "Depending on the length of the appointments you may observe one or more calls."
+        }
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "Pre-Call Preparation Observation",
+      "required": true,
+      "questions": [
+        {
+          "id": "q_s2_4",
+          "type": "long_text",
+          "prompt": "How does the Sales Rep qualify the opportunity?",
+          "required": true
+        },
+        {
+          "id": "q_s2_5",
+          "type": "long_text",
+          "prompt": "How did the Sales Rep prepare the agenda and objectives for the call?",
+          "required": true
+        },
+        {
+          "id": "q_s2_6",
+          "type": "long_text",
+          "prompt": "What does the Sales Rep bring along for the meeting?",
+          "required": true,
+          "helpText": "For example, marketing collateral, data on existing systems, or a security review form."
+        },
+        {
+          "id": "q_s2_7",
+          "type": "long_text",
+          "prompt": "Where does the Sales Rep secure the materials needed?",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "s3",
+      "title": "Appointment Interview/Observation Sheet",
+      "required": true,
+      "questions": [
+        {
+          "id": "q_s3_8",
+          "type": "short_text",
+          "prompt": "Name of Customer",
+          "required": true
+        },
+        {
+          "id": "q_s3_9",
+          "type": "short_text",
+          "prompt": "Type of Business",
+          "required": true
+        },
+        {
+          "id": "q_s3_10",
+          "type": "yes_no",
+          "prompt": "Did you arrive at the appointment on time?",
+          "required": true
+        },
+        {
+          "id": "q_s3_11",
+          "type": "long_text",
+          "prompt": "How did the Sales Rep begin the conversation with the customer?",
+          "required": true
+        },
+        {
+          "id": "q_s3_12",
+          "type": "long_text",
+          "prompt": "What techniques did this rep use that you will use to establish contact and credibility with the commercial customer?",
+          "required": true
+        },
+        {
+          "id": "q_s3_13",
+          "type": "yes_no",
+          "prompt": "During the appointment, did the Sales Rep follow the solution selling process?",
+          "required": true
+        },
+        {
+          "id": "q_s3_14",
+          "type": "long_text",
+          "prompt": "What techniques did you observe on the part of the Sales Rep that indicated attention to and concern for the customer’s property and peace of mind?",
+          "required": true
+        },
+        {
+          "id": "q_s3_15",
+          "type": "long_text",
+          "prompt": "Based on your experience today, what do you see as the greatest challenge in managing the sales call?",
+          "required": true
+        },
+        {
+          "id": "q_s3_16",
+          "type": "long_text",
+          "prompt": "What did you learn during this appointment that will be useful to you when you are on a sales call?",
+          "required": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,210 @@
+{
+  "id": "ae-service-ride-along-observation-workbook",
+  "title": "AE Service Ride-Along Observation Workbook",
+  "description": "Field observation workbook for Associate Account Executives completing the AE Service Ride-Along assignment: a service team meeting, a Service Manager job shadow, and a service technician ride-along observation.",
+  "version": "1.0",
+  "author": "Johnson Controls ASCEND Learning",
+  "courseId": "ascend-ae-service-ride-along",
+  "estimatedDuration": "2-3 weeks",
+  "settings": {
+    "language": "en-US",
+    "navigation": "free",
+    "completionRule": "all-required-sections",
+    "reportSuccess": false
+  },
+  "sections": [
+    {
+      "id": "s1",
+      "title": "Service Team Meeting",
+      "required": true,
+      "questions": [
+        {
+          "id": "q_s1_1",
+          "type": "long_text",
+          "prompt": "What were the safety topics discussed, if any?",
+          "required": true
+        },
+        {
+          "id": "q_s1_2",
+          "type": "long_text",
+          "prompt": "Identify 3 topics of discussion from the meeting.",
+          "required": true,
+          "helpText": "List three separate topics covered in the meeting."
+        },
+        {
+          "id": "q_s1_3",
+          "type": "long_text",
+          "prompt": "How do the topics of these meetings impact you in your role?",
+          "required": true
+        },
+        {
+          "id": "q_s1_4",
+          "type": "long_text",
+          "prompt": "Notes",
+          "required": false,
+          "helpText": "Capture any additional observations from the service team meeting."
+        }
+      ]
+    },
+    {
+      "id": "s2",
+      "title": "Service Manager Job Shadow Worksheet",
+      "required": true,
+      "questions": [
+        {
+          "id": "q_s2_5",
+          "type": "long_text",
+          "prompt": "Describe a typical day for a Service Manager.",
+          "required": true
+        },
+        {
+          "id": "q_s2_6",
+          "type": "long_text",
+          "prompt": "What weekly and monthly meetings are you responsible to attend and what office activities are you responsible to complete?",
+          "required": true
+        },
+        {
+          "id": "q_s2_7",
+          "type": "long_text",
+          "prompt": "For each meeting or activity, note when and where it takes place.",
+          "required": true,
+          "helpText": "Include the meeting/activity name along with the timing and location."
+        },
+        {
+          "id": "q_s2_8",
+          "type": "long_text",
+          "prompt": "Identify (by name) the lead person for each function in this department.",
+          "required": true
+        },
+        {
+          "id": "q_s2_9",
+          "type": "long_text",
+          "prompt": "Identify other personnel that you may be in contact with.",
+          "required": true,
+          "helpText": "For example, Admin or Safety Coordinator."
+        },
+        {
+          "id": "q_s2_10",
+          "type": "short_text",
+          "prompt": "Key point of contact with the Service Coordinator",
+          "required": true,
+          "helpText": "Describe the key points of contact between the Service Manager and this role."
+        },
+        {
+          "id": "q_s2_11",
+          "type": "short_text",
+          "prompt": "Key point of contact with the Service Technician",
+          "required": true,
+          "helpText": "Describe the key points of contact between the Service Manager and this role."
+        },
+        {
+          "id": "q_s2_12",
+          "type": "long_text",
+          "prompt": "List the different types of Johnson Controls customer accounts.",
+          "required": true
+        },
+        {
+          "id": "q_s2_13",
+          "type": "long_text",
+          "prompt": "As the AAE, which of the customer accounts will you be involved with?",
+          "required": true
+        },
+        {
+          "id": "q_s2_14",
+          "type": "long_text",
+          "prompt": "Which customer accounts is the Associate Account Executive (AAE) involved with, and which is the AAE NOT involved with?",
+          "required": true,
+          "helpText": "Distinguish the accounts the AAE is involved with from those the AAE is not."
+        },
+        {
+          "id": "q_s2_15",
+          "type": "long_text",
+          "prompt": "Describe how the Service Manager uses the following software systems: Compass, MAStermind, ADMIN, Excel, Scheduling, and any other systems.",
+          "required": true,
+          "helpText": "Address each system: Compass, MAStermind, ADMIN, Excel, Scheduling, Other."
+        },
+        {
+          "id": "q_s2_16",
+          "type": "long_text",
+          "prompt": "What can you do as an AAE to facilitate the Service Manager role?",
+          "required": true,
+          "helpText": "If this is not addressed during your assignment, be sure to ask how you can facilitate this role."
+        },
+        {
+          "id": "q_s2_17",
+          "type": "long_text",
+          "prompt": "Describe a Final Job Review.",
+          "required": true
+        },
+        {
+          "id": "q_s2_18",
+          "type": "long_text",
+          "prompt": "When preparing for approval/sign-off of the Final Job Review, what are the key elements the Service Manager looks for?",
+          "required": true
+        }
+      ]
+    },
+    {
+      "id": "s3",
+      "title": "Service Technician Ride-Along: Observation Sheet",
+      "required": true,
+      "questions": [
+        {
+          "id": "q_s3_19",
+          "type": "short_text",
+          "prompt": "Name of Customer",
+          "required": true
+        },
+        {
+          "id": "q_s3_20",
+          "type": "short_text",
+          "prompt": "Type of Business",
+          "required": true
+        },
+        {
+          "id": "q_s3_21",
+          "type": "yes_no",
+          "prompt": "Did you arrive at the appointment on time?",
+          "required": true
+        },
+        {
+          "id": "q_s3_22",
+          "type": "long_text",
+          "prompt": "How did the service Tech begin the conversation with the customer?",
+          "required": true
+        },
+        {
+          "id": "q_s3_23",
+          "type": "long_text",
+          "prompt": "What techniques did this tech use that you will use to establish contact and credibility with the commercial customer?",
+          "required": true
+        },
+        {
+          "id": "q_s3_24",
+          "type": "long_text",
+          "prompt": "What techniques did you observe on the part of the service Tech that indicated attention to and concern for the customer’s property and peace of mind?",
+          "required": true
+        },
+        {
+          "id": "q_s3_25",
+          "type": "long_text",
+          "prompt": "Based on your experience today, what do you see as the greatest challenge in managing the service call?",
+          "required": true
+        },
+        {
+          "id": "q_s3_26",
+          "type": "long_text",
+          "prompt": "What did you learn during this appointment that will be useful to you when you are on a sales call?",
+          "required": true
+        },
+        {
+          "id": "q_s3_27",
+          "type": "datetime",
+          "prompt": "Date of the ride-along appointment",
+          "required": true,
+          "helpText": "Record the date of the service technician ride-along."
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 {
   "name": "sowb-it",
-  "version": "1.6.1",
+  "version": "1.7.0",
   "private": true,
   "description": "Author digital observation workbooks and export them as self-contained packages for any SCORM 2004 4th Edition compliant LMS.",
   "type": "module",

@@ -36,6 +36,23 @@ npm run test:e2e         # Playwright learner specs (see below)
 
 ---
 
+## Library and folders
+
+Saved workbooks are JSON files under `data/workbooks/`. Folders are real subdirectories there, so you can also organize them in Finder/Explorer and the Library picks the changes up. A workbook is addressed by its path relative to `data/workbooks/` (for example `ASCEND/HVAC/Month-1/ppe-basics.json`).
+
+The **Library** screen shows them as a tree:
+
+- **Folders** expand and collapse, and show how many workbooks they hold (subfolders included). **Expand all** / **Collapse all** and **+ New folder** sit above the tree.
+- **Select several and move them.** Tick workbooks, or a folder's box to tick everything inside it, then **Move to folder** in the selection bar. **Delete selected** removes them after a confirmation. A workbook whose file name already exists in the destination is skipped and reported, never overwritten.
+- **Per-item actions** are in each row's **⋮** menu. Folders: *New subfolder*, *Rename folder*, *Delete folder* (empty folders only). Workbooks: *Open*, *Clone*, *Rename file*, *Move to…*, *Delete*. Clicking a workbook's title also opens it.
+- Expanded folders and ticked workbooks are remembered while you move between screens.
+
+Folder API: `GET /api/folders`, `POST /api/folders {path}`, `POST /api/folders/rename {path, name}`, `DELETE /api/folders?path=` (empty only), and `POST /api/workbooks/<file>/move {folder}`. Folder and file names are sanitized, and paths cannot leave `data/workbooks/`.
+
+> **Behind a proxy or CDN:** the server sends `Cache-Control: no-cache` for the UI files so an update shows on the next reload. A CDN such as Cloudflare can override that with its own browser-cache TTL; set it to *Respect existing headers* (or bypass caching for this host) and purge the cache after an update.
+
+---
+
 ## Completion state model
 
 A question has **three states**, because a response can exist and still fail its requirement:
@@ -319,3 +336,26 @@ Node.js >= 20 with built-in `node:http`; zero-build vanilla ES modules for both 
 ## cmi5 forward compatibility
 
 The authored JSON keeps prompts out of suspend data and treats evidence as metadata only, so the same content can later publish to cmi5 without re-authoring. `packages/export-service/targets/cmi5.js` documents the planned target; it is intentionally not registered in the MVP.
+
+## Changelog
+
+### 1.7.0 (2026-10-23)
+
+- **Library tree view.** Saved workbooks and folders show as one expandable tree in place of folder-by-folder browsing, with **Expand all** / **Collapse all**.
+- **Multi-select move.** Tick workbooks (or a whole folder) and move them together with **Move to folder**; partly ticked folders show a mixed checkbox. Name clashes in the destination are skipped and reported.
+- **Delete selected** removes several workbooks at once, after a confirmation.
+- **⋮ action menus** replace the per-row buttons. Clicking a workbook's title opens it. Menus close on Escape or an outside click, and open upward near the bottom of the window.
+- Drawn folder and file icons replace the emoji.
+- Fix: *Rename file* on a workbook inside a folder now pre-fills just the file name, not the folder path.
+
+### 1.6.1 (2026-10-23)
+
+- The server sends `Cache-Control: no-cache` for the authoring UI, so browsers pick up a new version on reload instead of running stale cached modules.
+- `package-lock.json` versions brought in line with `package.json`.
+
+### 1.6.0 (2026-10-23)
+
+- **Library folders.** Workbooks can be organized into nested folders (real subdirectories of `data/workbooks/`): create, rename and delete (empty) folders, and move workbooks between them. Clone and rename keep a workbook in its folder.
+- New API routes: `/api/folders` (list, create, rename, delete) and `/api/workbooks/<file>/move`.
+
+Earlier versions: see the git history.

@@ -70,6 +70,16 @@ export function renderHelp(mount) {
       p('The heading above the section list is also editable on Workbook Settings, e.g. "Your Milestones".'),
     ]),
 
+    section('Organizing the Library', [
+      p('Saved workbooks appear as a tree of folders. Click a folder to expand or collapse it, or use Expand all / Collapse all. + New folder adds a folder at the top level.'),
+      list([
+        ['Move several at once', 'Tick workbooks, or tick a folder to select everything inside it, then choose Move to folder in the selection bar. Delete selected removes the ticked workbooks after a confirmation.'],
+        ['Folder actions', 'The ⋮ menu on a folder has New subfolder, Rename folder, and Delete folder. Only an empty folder can be deleted.'],
+        ['Workbook actions', 'The ⋮ menu on a workbook has Open, Clone, Rename file, Move to…, and Delete. Clicking a workbook’s title also opens it.'],
+      ]),
+      p('If a workbook with the same file name is already in the destination folder, it is skipped rather than overwritten, and you are told which ones were not moved.'),
+    ]),
+
     section('Bulk authoring with Excel', [
       p('From the Library screen, download the Excel template. It has Instructions, Settings, Sections, and Questions sheets with a working example. Fill it in, then import it back to load a whole workbook at once.'),
       p('In the Questions sheet, prefix an option with an asterisk to mark it expected, for example "Scope review | *Safety plan". The Rating Scale column accepts a scale id, a scale name, explicit points like "1=Strongly Agree | 2=Agree", bare labels, or 1-5. Use Min, Max, and Whole Numbers for numeric questions. Columns are matched by header name, so older templates still import cleanly.'),
