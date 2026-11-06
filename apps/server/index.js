@@ -89,7 +89,7 @@ async function handleApi(req, res, path, url) {
   if (renameMatch && req.method === 'POST') {
     try {
       const { name } = await readBodyJson(req);
-      return sendJson(res, 200, { file: await renameWorkbook(renameMatch[1], name) });
+      return sendJson(res, 200, await renameWorkbook(renameMatch[1], name));
     } catch (err) {
       return sendJson(res, err.status || 500, { error: err.message });
     }

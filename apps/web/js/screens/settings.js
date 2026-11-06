@@ -10,7 +10,10 @@ export function renderSettings(mount, { store }) {
     h('span.field-label', label),
     opts.textarea
       ? h('textarea', { rows: 3, value: get() || '', oninput: (e) => store.update(() => set(e.target.value)) })
-      : h('input', { type: 'text', value: get() || '', placeholder: opts.placeholder || '', oninput: (e) => store.update(() => set(e.target.value)) }),
+      : h('input', {
+        type: 'text', value: get() || '', placeholder: opts.placeholder || '', readOnly: !!opts.readonly,
+        oninput: opts.readonly ? null : (e) => store.update(() => set(e.target.value)),
+      }),
     opts.hint ? h('span.field-hint', opts.hint) : null,
   ]);
   const selectField = (label, get, set, options) => h('label.field', [
@@ -29,7 +32,7 @@ export function renderSettings(mount, { store }) {
         textField('Title', () => wb.title, (v) => (wb.title = v)),
         textField('Version', () => wb.version, (v) => (wb.version = v)),
         textField('Author', () => wb.author, (v) => (wb.author = v)),
-        textField('Course ID', () => wb.courseId, (v) => (wb.courseId = v), { hint: 'Used for the SCORM identifier and file names. Letters, numbers, dashes.' }),
+        textField('Course ID', () => wb.courseId, null, { readonly: true, placeholder: '(set when the file is renamed)', hint: 'Used for the SCORM identifier and file names. Set automatically from the file name when you rename the workbook in the Library.' }),
         textField('Language', () => wb.settings.language, (v) => (wb.settings.language = v)),
         textField('Estimated Duration', () => wb.estimatedDuration, (v) => (wb.estimatedDuration = v), { hint: 'e.g. "3 months"' }),
       ]),

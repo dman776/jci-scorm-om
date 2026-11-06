@@ -294,8 +294,13 @@ export async function renderLibrary(mount, { store, api, navigate }) {
     const entered = window.prompt('New file name (without .json):', baseOf(file).replace(/\.json$/, ''));
     if (entered === null) return;
     try {
-      const { file: renamed } = await api.renameWorkbook(file, entered);
-      if (store.file === file) store.setFile(renamed);
+      const { file: renamed, courseId } = await api.renameWorkbook(file, entered);
+      if (store.file === file) {
+        store.setFile(renamed);
+        // The server already wrote the new course id; mirror it without marking the workbook dirty.
+        store.workbook.courseId = courseId;
+        store.persist();
+      }
       if (selected.delete(file)) selected.add(renamed);
       toast('Renamed to ' + baseOf(renamed), 'success');
       await refreshList();

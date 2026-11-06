@@ -178,9 +178,10 @@ export async function deleteWorkbook(id) {
 }
 
 /**
- * Rename a workbook FILE. The workbook's own id and title are left alone.
+ * Rename a workbook FILE and set its `courseId` to the new file name (without
+ * `.json`). The workbook's own id and title are left alone.
  * Throws an Error with `.status` 404 (no such file), 400 (bad name) or 409 (taken).
- * @returns {Promise<string>} the new file name
+ * @returns {Promise<{file:string, courseId:string}>} the new file name and course id
  */
 export async function renameWorkbook(file, newName) {
   await ensureDir();
@@ -189,9 +190,18 @@ export async function renameWorkbook(file, newName) {
   const from = safeName(file);
   const to = posix.join(posix.dirname(from) === '.' ? '' : posix.dirname(from), safeName(base + '.json'));
   try { await access(join(DATA_DIR, from)); } catch (_) { throw fail(404, 'Not found'); }
-  if (to === from) return to;
-  const exists = await access(join(DATA_DIR, to)).then(() => true, () => false);
-  if (exists) throw fail(409, `A file named ${to} already exists.`);
-  await rename(join(DATA_DIR, from), join(DATA_DIR, to));
-  return to;
+  const courseId = posix.basename(to).replace(/\.json$/, '');
+  if (to !== from) {
+    const exists = await access(join(DATA_DIR, to)).then(() => true, () => false);
+    if (exists) throw fail(409, `A file named ${to} already exists.`);
+    await rename(join(DATA_DIR, from), join(DATA_DIR, to));
+  }
+  try {
+    const wb = JSON.parse(await readFile(join(DATA_DIR, to), 'utf8'));
+    if (wb.courseId !== courseId) {
+      wb.courseId = courseId;
+      await writeFile(join(DATA_DIR, to), JSON.stringify(wb, null, 2), 'utf8');
+    }
+  } catch (_) { /* unreadable JSON: the file is still renamed */ }
+  return { file: to, courseId };
 }
