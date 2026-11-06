@@ -74,6 +74,18 @@ class Store {
       if (s) s.questions = s.questions.filter((q) => q.id !== qid);
     });
   }
+  /** Move a question to the end of another section. */
+  moveQuestionToSection(fromSectionId, qid, toSectionId) {
+    if (fromSectionId === toSectionId) return;
+    this.update((wb) => {
+      const from = wb.sections.find((x) => x.id === fromSectionId);
+      const to = wb.sections.find((x) => x.id === toSectionId);
+      if (!from || !to) return;
+      const idx = from.questions.findIndex((q) => q.id === qid);
+      if (idx < 0) return;
+      to.questions.push(...from.questions.splice(idx, 1));
+    });
+  }
   moveQuestion(sectionId, qid, dir) {
     this.update((wb) => {
       const s = wb.sections.find((x) => x.id === sectionId);

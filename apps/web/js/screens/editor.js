@@ -118,6 +118,26 @@ function renderCenter(wb, store, rerender) {
   ]);
 }
 
+/** "Move to…" picker listing the other sections; the question lands at the end of the chosen one. */
+function moveToSectionSelect(section, q, store, rerender) {
+  const wb = store.workbook;
+  const others = wb.sections.map((s, i) => ({ s, i })).filter(({ s }) => s.id !== section.id);
+  if (others.length === 0) return null;
+  return h('select.q-move-select', {
+    title: 'Move this question to another section',
+    onchange: (e) => {
+      const target = wb.sections.find((s) => s.id === e.target.value);
+      if (!target) return;
+      store.moveQuestionToSection(section.id, q.id, target.id);
+      toast(`Moved to ${target.title || 'Untitled'}`, 'success');
+      rerender();
+    },
+  }, [
+    h('option', { value: '', selected: true, disabled: true }, 'Move to\u2026'),
+    ...others.map(({ s, i }) => h('option', { value: s.id }, `${i + 1}. ${s.title || 'Untitled'}`)),
+  ]);
+}
+
 function renderQuestionCard(section, q, qi, store, rerender) {
   const typeMeta = ALL_TYPES.find((t) => t.value === q.type) || { label: q.type };
   return h('div.q-card', [
@@ -126,6 +146,7 @@ function renderQuestionCard(section, q, qi, store, rerender) {
       h('span.q-type-tag', typeMeta.label),
       h('div.q-card-actions', [
         h('button.btn.small.ghost', { title: 'Preview just this question as the learner sees it', onclick: () => previewQuestion(store.workbook, section, q) }, 'Preview'),
+        moveToSectionSelect(section, q, store, rerender),
         iconBtn('\u2191', 'Move up', () => { store.moveQuestion(section.id, q.id, -1); rerender(); }),
         iconBtn('\u2193', 'Move down', () => { store.moveQuestion(section.id, q.id, 1); rerender(); }),
         iconBtn('\u29c9', 'Duplicate', () => { store.duplicateQuestion(section.id, q.id); rerender(); }),
