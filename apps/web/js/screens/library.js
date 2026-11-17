@@ -203,6 +203,7 @@ export async function renderLibrary(mount, { store, api, navigate }) {
           ...(w.unreadable ? [] : [
             { label: 'Open', onclick: () => onOpen(w.file) },
             { label: 'Clone', onclick: () => onClone(w.file) },
+            { label: 'Share preview link', onclick: () => onSharePreview(w) },
           ]),
           { label: 'Rename file', onclick: () => onRename(w.file) },
           { label: 'Move to…', onclick: () => moveOne(w.file) },
@@ -319,6 +320,16 @@ export async function renderLibrary(mount, { store, api, navigate }) {
     store.set(wb); store.setFile(file); store.markSaved();
     toast('Opened ' + wb.title, 'success');
     navigate('editor');
+  }
+  /** Copy a link to the learner preview of this saved workbook (served straight from the library file). */
+  async function onSharePreview(w) {
+    const link = `${location.origin}/preview/w/${w.file.split('/').map(encodeURIComponent).join('/')}/harness.html`;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast('Preview link copied for ' + w.title, 'success');
+    } catch (_) {
+      toast('Could not copy automatically. Preview link: ' + link, 'info');
+    }
   }
   async function onDelete(file) {
     if (!(await confirmDialog('Delete this saved workbook? This cannot be undone.'))) return;

@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Learner Preview - Mock LMS</title>
-  <link rel="stylesheet" href="/preview/runtime/css/player.css" />
+  <link rel="stylesheet" href="runtime/css/player.css" />
   <style>
     body { background: #eef1f7; }
     .harness-bar {
@@ -33,11 +33,11 @@
   </div>
   <div id="host" role="main"></div>
 
-  <script src="/preview/runtime/js/workbook.js"></script>
+  <script src="runtime/js/workbook.js"></script>
   <script type="module">
     import { MockLMS } from '/preview/mock-lms.js';
-    import { ScormAdapter } from '/preview/runtime/js/adapter.js';
-    import { WorkbookPlayer } from '/preview/runtime/js/player.js';
+    import { ScormAdapter } from './runtime/js/adapter.js';
+    import { WorkbookPlayer } from './runtime/js/player.js';
 
     const workbook = window.__WORKBOOK__;
     const host = document.getElementById('host');

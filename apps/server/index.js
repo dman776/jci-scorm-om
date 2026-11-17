@@ -189,18 +189,33 @@ async function handlePreview(req, res, path) {
   if (path === '/preview/mock-lms.js') {
     return sendText(res, 200, await readFile(MOCK_LMS_FILE, 'utf8'), 'text/javascript');
   }
+  // Shareable preview of a saved library workbook: /preview/w/<file>/harness.html
+  // (and its runtime/...), read from disk on every request so it is always current.
+  const wbMatch = /^\/preview\/w\/(.+\.json)\/(harness\.html|runtime\/.+)$/.exec(path);
+  if (wbMatch) {
+    const wb = await getWorkbook(wbMatch[1]);
+    if (!wb) return sendText(res, 404, 'No saved workbook: ' + wbMatch[1], 'text/plain');
+    if (wbMatch[2] === 'harness.html') return sendHarness(res);
+    return sendRuntimeFile(res, inlineScales(wb, await listCustomScales()), wbMatch[2].slice('runtime/'.length));
+  }
   const rtMatch = /^\/preview\/runtime\/(.+)$/.exec(path);
   if (rtMatch) {
     if (!previewWorkbook) return sendText(res, 409, '// No preview workbook loaded.', 'text/javascript');
-    const files = await assembleRuntime(previewWorkbook, { debug: true });
-    const content = files[rtMatch[1]];
-    if (content == null) return sendText(res, 404, 'Not found: ' + rtMatch[1], 'text/plain');
-    return sendText(res, 200, content, mimeFor(rtMatch[1]));
+    return sendRuntimeFile(res, previewWorkbook, rtMatch[1]);
   }
-  if (path === '/preview/harness.html') {
-    return sendText(res, 200, await readFile(join(WEB_DIR, 'preview-harness.html'), 'utf8'), 'text/html');
-  }
+  if (path === '/preview/harness.html') return sendHarness(res);
   return sendText(res, 404, 'Not found', 'text/plain');
+}
+
+async function sendHarness(res) {
+  return sendText(res, 200, await readFile(join(WEB_DIR, 'preview-harness.html'), 'utf8'), 'text/html');
+}
+
+async function sendRuntimeFile(res, workbook, name) {
+  const files = await assembleRuntime(workbook, { debug: true });
+  const content = files[name];
+  if (content == null) return sendText(res, 404, 'Not found: ' + name, 'text/plain');
+  return sendText(res, 200, content, mimeFor(name));
 }
 
 // ---- static web UI -------------------------------------------------------
